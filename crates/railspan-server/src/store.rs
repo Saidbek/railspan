@@ -433,6 +433,7 @@ impl Store {
         Ok(out)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn list_traces(
         &self,
         from_ns: i64,
