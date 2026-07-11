@@ -7,5 +7,11 @@ services:
       - "7421:7421"
     environment:
       RAILSPAN_INGEST_ADDR: "0.0.0.0:7421"
-      RAILSPAN_API_KEY: ""
-    # Placeholder image until release packaging; build may be used after Dockerfile is filled in.
+      RAILSPAN_DATA_DIR: "/data"
+      RAILSPAN_SAMPLE_RATE: "1.0"
+      RAILSPAN_RETENTION_DAYS: "7"
+    volumes:
+      - railspan-data:/data
+
+volumes:
+  railspan-data:

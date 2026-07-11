@@ -1,5 +1,11 @@
 # Roadmap
 
+## IMPLEMENTATION STATUS (2026-07-11)
+
+Phases 0–5 MVP delivered in-tree. See CHANGELOG and USER_GUIDE.
+
+# Roadmap
+
 ## Timeline overview
 
 ```mermaid

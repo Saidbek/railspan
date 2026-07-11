@@ -1,10 +1,11 @@
-# Railspan developer commands
-
 default:
     @just --list
 
 build:
     cargo build --workspace
+
+release:
+    cargo build -p railspan-cli --release
 
 test: test-rust test-gem
 
@@ -23,5 +24,5 @@ fmt:
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 
-dummy-rails:
+dummy:
     cd examples/dummy_rails && RAILSPAN_EXPORTER=http RAILSPAN_ENDPOINT=http://127.0.0.1:7421 bundle exec rails server -p 3000

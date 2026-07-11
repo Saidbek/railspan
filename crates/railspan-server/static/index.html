@@ -6,274 +6,159 @@
   <title>Railspan</title>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a2332;
-      --border: #2d3a4d;
-      --text: #e7ecf3;
-      --muted: #8b9bb4;
-      --accent: #5b9fd4;
-      --ok: #3ecf8e;
-      --err: #f07178;
-      --sql: #c3a6ff;
-      --view: #ffcc66;
-      --http: #5b9fd4;
+      --bg: #0f1419; --panel: #1a2332; --border: #2d3a4d; --text: #e7ecf3;
+      --muted: #8b9bb4; --accent: #5b9fd4; --err: #f07178; --ok: #3ecf8e;
+      --sql: #c3a6ff; --view: #ffcc66; --http: #5b9fd4; --job: #f6a; --n1: #ff8a65;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.45;
-    }
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--border);
-      background: var(--panel);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    header h1 {
-      margin: 0;
-      font-size: 1.15rem;
-      font-weight: 650;
-      letter-spacing: 0.02em;
-    }
-    header h1 span { color: var(--accent); }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border); background: var(--panel); position: sticky; top: 0; z-index: 10; gap: 1rem; flex-wrap: wrap; }
+    header h1 { margin: 0; font-size: 1.15rem; } header h1 span { color: var(--accent); }
+    nav { display: flex; gap: 0.5rem; }
+    nav button { background: transparent; border: 1px solid transparent; color: var(--muted); border-radius: 8px; padding: 0.4rem 0.75rem; cursor: pointer; font: inherit; }
+    nav button.active, nav button:hover { color: var(--text); border-color: var(--border); background: #121a24; }
     .meta { color: var(--muted); font-size: 0.85rem; }
     main { padding: 1.25rem 1.5rem 3rem; max-width: 1200px; margin: 0 auto; }
-    .toolbar {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      align-items: center;
-      margin-bottom: 1rem;
-    }
-    button, select {
-      background: var(--panel);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.45rem 0.75rem;
-      cursor: pointer;
-      font: inherit;
-    }
-    button:hover { border-color: var(--accent); }
+    .toolbar { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+    button, select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.75rem; cursor: pointer; font: inherit; }
     button.primary { background: #1e3a56; border-color: var(--accent); }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    th, td {
-      text-align: left;
-      padding: 0.65rem 0.8rem;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.92rem;
-    }
-    th {
-      color: var(--muted);
-      font-weight: 600;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
+    table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
     tr:last-child td { border-bottom: none; }
-    tbody tr { cursor: pointer; }
-    tbody tr:hover { background: rgba(91, 159, 212, 0.08); }
-    .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .badge {
-      display: inline-block;
-      padding: 0.1rem 0.45rem;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      background: #243044;
-      color: var(--muted);
-    }
+    tbody tr { cursor: pointer; } tbody tr:hover { background: rgba(91,159,212,0.08); }
+    .num { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; }
+    .badge { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.75rem; background: #243044; color: var(--muted); }
     .badge.err { background: rgba(240,113,120,0.15); color: var(--err); }
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem;
-      margin-top: 1rem;
-    }
-    .panel h2 {
-      margin: 0 0 0.75rem;
-      font-size: 1rem;
-    }
-    .empty {
-      color: var(--muted);
-      padding: 2rem;
-      text-align: center;
-      border: 1px dashed var(--border);
-      border-radius: 10px;
-    }
-    .empty code {
-      display: block;
-      text-align: left;
-      background: #0c1016;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      margin-top: 0.75rem;
-      overflow-x: auto;
-      font-size: 0.85rem;
-      color: #c8d4e6;
-    }
-    .waterfall { position: relative; }
-    .wf-row {
-      display: grid;
-      grid-template-columns: 220px 90px 1fr;
-      gap: 0.5rem;
-      align-items: center;
-      margin: 0.25rem 0;
-      font-size: 0.85rem;
-    }
-    .wf-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-    .wf-bar-wrap {
-      position: relative;
-      height: 18px;
-      background: #121a24;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-    .wf-bar {
-      position: absolute;
-      top: 2px;
-      bottom: 2px;
-      border-radius: 3px;
-      min-width: 2px;
-      opacity: 0.9;
-    }
-    .kind-http.server, .kind-http\.server { background: var(--http); }
-    .kind-controller { background: #4fd1c5; }
-    .kind-sql { background: var(--sql); }
-    .kind-view, .kind-partial { background: var(--view); }
-    .kind-custom, .kind-job { background: #f6a; }
+    .badge.n1 { background: rgba(255,138,101,0.18); color: var(--n1); }
+    .badge.job { background: rgba(255,102,170,0.15); color: var(--job); }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-top: 1rem; }
+    .panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+    .empty { color: var(--muted); padding: 2rem; text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
+    .empty code { display: block; text-align: left; background: #0c1016; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.75rem; overflow-x: auto; font-size: 0.85rem; color: #c8d4e6; }
+    .wf-row { display: grid; grid-template-columns: 240px 90px 1fr; gap: 0.5rem; align-items: center; margin: 0.25rem 0; font-size: 0.85rem; }
+    .wf-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; }
+    .wf-bar-wrap { position: relative; height: 18px; background: #121a24; border-radius: 4px; overflow: hidden; }
+    .wf-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; min-width: 2px; }
+    .k-http\.server, .k-http { background: var(--http); }
+    .k-controller { background: #4fd1c5; } .k-sql { background: var(--sql); }
+    .k-view, .k-partial { background: var(--view); } .k-job, .k-job\.enqueue { background: var(--job); }
+    .k-cache { background: #81c784; } .k-http\.client { background: #64b5f6; }
     .hidden { display: none; }
-    a.back { color: var(--accent); text-decoration: none; cursor: pointer; }
-    .error-text { color: var(--err); }
+    a.back { color: var(--accent); cursor: pointer; }
+    .n1-box { border-left: 3px solid var(--n1); padding: 0.5rem 0.75rem; margin: 0.4rem 0; background: rgba(255,138,101,0.08); border-radius: 0 6px 6px 0; font-size: 0.88rem; }
+    .deploy-line { height: 2px; background: var(--accent); margin: 0.5rem 0; position: relative; }
+    .deploy-line span { position: absolute; top: -1.1rem; font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
   </style>
 </head>
 <body>
   <header>
     <h1><span>Rail</span>span</h1>
+    <nav>
+      <button class="active" data-tab="endpoints">Endpoints</button>
+      <button data-tab="jobs">Jobs</button>
+      <button data-tab="n1">N+1</button>
+      <button data-tab="deploys">Deploys</button>
+    </nav>
     <div class="meta" id="stats">Loading…</div>
   </header>
   <main>
-    <div id="view-endpoints">
-      <div class="toolbar">
-        <label>
-          Range
-          <select id="hours">
-            <option value="1">1h</option>
-            <option value="6">6h</option>
-            <option value="24" selected>24h</option>
-            <option value="168">7d</option>
-            <option value="8760">30d+</option>
-          </select>
-        </label>
-        <button class="primary" id="refresh">Refresh</button>
-      </div>
+    <div class="toolbar">
+      <label>Range
+        <select id="hours">
+          <option value="1">1h</option><option value="6">6h</option>
+          <option value="24" selected>24h</option><option value="168">7d</option>
+        </select>
+      </label>
+      <button class="primary" id="refresh">Refresh</button>
+    </div>
+
+    <div id="tab-endpoints">
       <div id="endpoints-empty" class="empty hidden">
         <strong>No traces yet</strong>
-        <p>Point your Rails app at this server and hit a few endpoints.</p>
-        <code>gem "railspan", path: "…/gem/railspan"
-
-# config/initializers/railspan.rb
-Railspan.configure do |c|
-  c.endpoint = "http://127.0.0.1:7421"
-  c.exporter = :http
-end</code>
+        <p>Instrument your Rails app and hit some endpoints.</p>
+        <code>cargo run -p railspan-cli -- serve
+# Gemfile: gem "railspan", path: "…/gem/railspan"
+Railspan.configure { |c| c.endpoint = "http://127.0.0.1:7421"; c.exporter = :http }</code>
       </div>
       <table id="endpoints-table" class="hidden">
-        <thead>
-          <tr>
-            <th>Endpoint</th>
-            <th>Count</th>
-            <th>Errors</th>
-            <th>p50</th>
-            <th>p95</th>
-            <th>p99</th>
-            <th>avg</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>Endpoint</th><th>Kind</th><th>Count</th><th>Errors</th><th>N+1</th>
+          <th>p50</th><th>p95</th><th>p99</th><th>avg</th>
+        </tr></thead>
         <tbody id="endpoints-body"></tbody>
       </table>
     </div>
 
+    <div id="tab-jobs" class="hidden">
+      <table><thead><tr><th>Job</th><th>Count</th><th>Errors</th><th>p95</th><th>avg</th></tr></thead>
+      <tbody id="jobs-body"></tbody></table>
+    </div>
+
+    <div id="tab-n1" class="hidden">
+      <div id="n1-list"></div>
+    </div>
+
+    <div id="tab-deploys" class="hidden">
+      <div class="toolbar">
+        <button id="add-deploy">Record deploy (now)</button>
+      </div>
+      <div id="deploy-list"></div>
+    </div>
+
     <div id="view-trace" class="hidden">
-      <p><a class="back" id="back">← Back to endpoints</a></p>
+      <p><a class="back" id="back">← Back</a></p>
       <div class="panel">
         <h2 id="trace-title">Trace</h2>
         <div class="meta" id="trace-meta"></div>
-        <div class="waterfall" id="waterfall" style="margin-top:1rem"></div>
+        <div id="trace-n1"></div>
+        <div id="waterfall" style="margin-top:1rem"></div>
       </div>
       <div class="panel">
-        <h2>Recent traces for this endpoint</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Trace</th>
-              <th>Duration</th>
-              <th>Status</th>
-              <th>Spans</th>
-              <th>When</th>
-            </tr>
-          </thead>
-          <tbody id="traces-body"></tbody>
-        </table>
+        <h2>Traces</h2>
+        <table><thead><tr><th>ID</th><th>Duration</th><th>Status</th><th>N+1</th><th>Spans</th><th>When</th></tr></thead>
+        <tbody id="traces-body"></tbody></table>
       </div>
     </div>
   </main>
   <script>
-    const $ = (id) => document.getElementById(id);
+    const $ = id => document.getElementById(id);
+    let currentTab = "endpoints";
+    let selectedResource = null;
 
-    async function api(path) {
-      const res = await fetch(path);
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     }
-
+    function hours() { return $("hours").value; }
     function fmtMs(ms) {
       if (ms == null || Number.isNaN(ms)) return "—";
       if (ms < 1) return ms.toFixed(2) + " ms";
       if (ms < 100) return ms.toFixed(1) + " ms";
       return Math.round(ms) + " ms";
     }
-
     function fmtTime(ns) {
       if (!ns) return "—";
-      const d = new Date(ns / 1e6);
-      return d.toLocaleString();
+      return new Date(ns / 1e6).toLocaleString();
     }
+    function esc(s) {
+      return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
+    }
+    function trunc(s, n) { s = String(s||""); return s.length > n ? s.slice(0,n-1)+"…" : s; }
 
     async function loadStats() {
       try {
         const s = await api("/api/v1/stats");
         const h = await api("/healthz");
-        $("stats").textContent = `${s.traces} traces · ${s.spans} spans · batches ${h.batches_received || 0}`;
-      } catch (e) {
-        $("stats").textContent = "stats unavailable";
-      }
+        $("stats").textContent = `${s.traces} traces · ${s.spans} spans · ${s.n_plus_one_events||0} N+1 · batches ${h.batches_received||0}`;
+      } catch { $("stats").textContent = "offline"; }
     }
 
     async function loadEndpoints() {
-      const hours = $("hours").value;
-      const data = await api(`/api/v1/endpoints?hours=${hours}`);
-      const rows = data.endpoints || [];
+      const data = await api(`/api/v1/endpoints?hours=${hours()}`);
+      const rows = (data.endpoints || []).filter(e => (e.kind||"http.server") !== "job");
       const tbody = $("endpoints-body");
       tbody.innerHTML = "";
       if (!rows.length) {
@@ -285,64 +170,134 @@ end</code>
       $("endpoints-table").classList.remove("hidden");
       for (const ep of rows) {
         const tr = document.createElement("tr");
-        const errClass = ep.error_count > 0 ? "badge err" : "badge";
         tr.innerHTML = `
-          <td>${escapeHtml(ep.resource)}</td>
+          <td>${esc(ep.resource)}</td>
+          <td><span class="badge">${esc(ep.kind||"http")}</span></td>
           <td class="num">${ep.count}</td>
-          <td><span class="${errClass}">${ep.error_count} (${(ep.error_rate * 100).toFixed(1)}%)</span></td>
+          <td><span class="badge ${ep.error_count?"err":""}">${ep.error_count}</span></td>
+          <td>${ep.n_plus_one_count ? `<span class="badge n1">${ep.n_plus_one_count}</span>` : "—"}</td>
           <td class="num">${fmtMs(ep.p50_ms)}</td>
           <td class="num">${fmtMs(ep.p95_ms)}</td>
           <td class="num">${fmtMs(ep.p99_ms)}</td>
           <td class="num">${fmtMs(ep.avg_ms)}</td>`;
-        tr.addEventListener("click", () => showEndpoint(ep.resource));
+        tr.onclick = () => showResource(ep.resource);
         tbody.appendChild(tr);
       }
     }
 
-    async function showEndpoint(resource) {
-      $("view-endpoints").classList.add("hidden");
-      $("view-trace").classList.remove("hidden");
-      $("trace-title").textContent = resource;
-      $("waterfall").innerHTML = "<div class='meta'>Select a trace…</div>";
-      const hours = $("hours").value;
-      const q = new URLSearchParams({ hours, resource, limit: 30 });
-      const data = await api(`/api/v1/traces?${q}`);
-      const tbody = $("traces-body");
+    async function loadJobs() {
+      const data = await api(`/api/v1/endpoints?hours=${hours()}`);
+      const rows = (data.endpoints || []).filter(e => e.kind === "job");
+      const tbody = $("jobs-body");
       tbody.innerHTML = "";
-      for (const t of data.traces || []) {
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="meta">No job traces yet (ActiveJob/Sidekiq)</td></tr>`;
+        return;
+      }
+      for (const ep of rows) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td class="num">${t.trace_id.slice(0, 12)}…</td>
-          <td class="num">${fmtMs(t.duration_ms)}</td>
-          <td>${t.is_error ? '<span class="badge err">error</span>' : '<span class="badge">ok</span>'}</td>
-          <td class="num">${t.span_count}</td>
-          <td class="meta">${fmtTime(t.start_time_ns)}</td>`;
-        tr.addEventListener("click", () => loadTrace(t.trace_id));
+          <td>${esc(ep.resource)}</td>
+          <td class="num">${ep.count}</td>
+          <td><span class="badge ${ep.error_count?"err":""}">${ep.error_count}</span></td>
+          <td class="num">${fmtMs(ep.p95_ms)}</td>
+          <td class="num">${fmtMs(ep.avg_ms)}</td>`;
+        tr.onclick = () => showResource(ep.resource, "job");
         tbody.appendChild(tr);
       }
-      if ((data.traces || []).length) {
-        loadTrace(data.traces[0].trace_id);
+    }
+
+    async function loadN1() {
+      const data = await api(`/api/v1/n-plus-one?hours=${hours()}`);
+      const el = $("n1-list");
+      const events = data.events || [];
+      if (!events.length) { el.innerHTML = `<div class="empty">No N+1 events in range</div>`; return; }
+      el.innerHTML = events.map(e => `
+        <div class="n1-box" style="cursor:pointer" data-tid="${esc(e.trace_id)}">
+          <strong>${esc(e.root_resource||"trace")}</strong>
+          · ${e.repeat_count}× · ${fmtMs(e.total_duration_ms)}
+          <div class="num meta">${esc(e.sql_fingerprint)}</div>
+          <div class="meta">${fmtTime(e.detected_at_ns)} · ${e.trace_id.slice(0,12)}…</div>
+        </div>`).join("");
+      el.querySelectorAll("[data-tid]").forEach(n => n.onclick = () => {
+        selectedResource = null;
+        showTraceOnly(n.dataset.tid);
+      });
+    }
+
+    async function loadDeploys() {
+      const data = await api(`/api/v1/deploys?hours=${hours()}`);
+      const el = $("deploy-list");
+      const deps = data.deploys || [];
+      if (!deps.length) { el.innerHTML = `<div class="empty">No deploy markers</div>`; return; }
+      el.innerHTML = deps.map(d => `
+        <div class="panel" style="margin-top:0.5rem">
+          <div><strong>${esc(d.version||d.git_sha||d.id)}</strong></div>
+          <div class="meta">${fmtTime(d.deployed_at_ns)} · sha ${esc(d.git_sha||"—")}</div>
+        </div>`).join("");
+    }
+
+    async function showResource(resource, kind) {
+      selectedResource = resource;
+      $("tab-endpoints").classList.add("hidden");
+      $("tab-jobs").classList.add("hidden");
+      $("tab-n1").classList.add("hidden");
+      $("tab-deploys").classList.add("hidden");
+      $("view-trace").classList.remove("hidden");
+      $("trace-title").textContent = resource;
+      const q = new URLSearchParams({ hours: hours(), resource, limit: 40 });
+      if (kind) q.set("kind", kind);
+      const data = await api(`/api/v1/traces?${q}`);
+      renderTraceList(data.traces || []);
+      if ((data.traces||[]).length) loadTrace(data.traces[0].trace_id);
+      else $("waterfall").innerHTML = "<div class='meta'>No traces</div>";
+    }
+
+    function renderTraceList(traces) {
+      const tbody = $("traces-body");
+      tbody.innerHTML = "";
+      for (const t of traces) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="num">${t.trace_id.slice(0,12)}…</td>
+          <td class="num">${fmtMs(t.duration_ms)}</td>
+          <td>${t.is_error ? '<span class="badge err">error</span>' : '<span class="badge">ok</span>'}</td>
+          <td>${t.has_n_plus_one ? '<span class="badge n1">N+1</span>' : "—"}</td>
+          <td class="num">${t.span_count}</td>
+          <td class="meta">${fmtTime(t.start_time_ns)}</td>`;
+        tr.onclick = () => loadTrace(t.trace_id);
+        tbody.appendChild(tr);
       }
+    }
+
+    async function showTraceOnly(traceId) {
+      $("tab-endpoints").classList.add("hidden");
+      $("tab-jobs").classList.add("hidden");
+      $("tab-n1").classList.add("hidden");
+      $("tab-deploys").classList.add("hidden");
+      $("view-trace").classList.remove("hidden");
+      $("traces-body").innerHTML = "";
+      await loadTrace(traceId);
     }
 
     async function loadTrace(traceId) {
       const detail = await api(`/api/v1/traces/${traceId}`);
       const t = detail.trace;
-      $("trace-meta").innerHTML = `
-        <span class="num">${traceId}</span> ·
-        ${fmtMs(t.duration_ms)} ·
-        ${t.is_error ? '<span class="error-text">error</span>' : 'ok'} ·
-        ${t.span_count} spans ·
-        ${fmtTime(t.start_time_ns)}`;
+      $("trace-title").textContent = t.root_resource || traceId;
+      $("trace-meta").innerHTML = `<span class="num">${traceId}</span> · ${fmtMs(t.duration_ms)} ·
+        ${t.is_error ? '<span class="badge err">error</span>' : 'ok'} ·
+        ${t.has_n_plus_one ? '<span class="badge n1">N+1</span>' : ''} ·
+        ${t.span_count} spans · ${fmtTime(t.start_time_ns)}`;
+      const n1 = detail.n_plus_one || [];
+      $("trace-n1").innerHTML = n1.map(e =>
+        `<div class="n1-box"><strong>N+1</strong> ${e.repeat_count}× ${fmtMs(e.total_duration_ms)}
+         <div class="num">${esc(e.sql_fingerprint)}</div></div>`).join("");
       renderWaterfall(detail.spans || []);
     }
 
     function renderWaterfall(spans) {
       const el = $("waterfall");
-      if (!spans.length) {
-        el.innerHTML = "<div class='meta'>No spans</div>";
-        return;
-      }
+      if (!spans.length) { el.innerHTML = "<div class='meta'>No spans</div>"; return; }
       const minStart = Math.min(...spans.map(s => s.start_ns));
       const maxEnd = Math.max(...spans.map(s => s.start_ns + s.duration_ns));
       const total = Math.max(maxEnd - minStart, 1);
@@ -350,40 +305,44 @@ end</code>
         const left = ((s.start_ns - minStart) / total) * 100;
         const width = Math.max((s.duration_ns / total) * 100, 0.3);
         const label = s.resource || s.name;
-        const kindClass = "kind-" + (s.kind || "custom").replace(/[^a-z0-9]+/gi, "\\.");
+        const k = "k-" + (s.kind || "custom").replace(/[^a-z0-9.]+/gi, "");
         return `<div class="wf-row">
-          <div class="wf-label" title="${escapeHtml(label)}">${escapeHtml(truncate(label, 36))}</div>
+          <div class="wf-label" title="${esc(label)}">${esc(trunc(label, 38))}</div>
           <div class="num">${fmtMs(s.duration_ms)}</div>
-          <div class="wf-bar-wrap">
-            <div class="wf-bar ${kindClass}" style="left:${left}%;width:${width}%"></div>
-          </div>
+          <div class="wf-bar-wrap"><div class="wf-bar ${k}" style="left:${left}%;width:${width}%"></div></div>
         </div>`;
       }).join("");
     }
 
-    function truncate(s, n) {
-      return s.length > n ? s.slice(0, n - 1) + "…" : s;
-    }
-
-    function escapeHtml(s) {
-      return String(s)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;");
-    }
-
-    $("back").addEventListener("click", () => {
+    function showTab(tab) {
+      currentTab = tab;
       $("view-trace").classList.add("hidden");
-      $("view-endpoints").classList.remove("hidden");
-      loadEndpoints();
-    });
-    $("refresh").addEventListener("click", () => { loadStats(); loadEndpoints(); });
-    $("hours").addEventListener("change", loadEndpoints);
+      ["endpoints","jobs","n1","deploys"].forEach(t => {
+        $(`tab-${t}`).classList.toggle("hidden", t !== tab);
+        document.querySelector(`nav button[data-tab="${t}"]`).classList.toggle("active", t === tab);
+      });
+      if (tab === "endpoints") loadEndpoints();
+      if (tab === "jobs") loadJobs();
+      if (tab === "n1") loadN1();
+      if (tab === "deploys") loadDeploys();
+    }
+
+    document.querySelectorAll("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+    $("back").onclick = () => showTab(currentTab === "jobs" ? "jobs" : "endpoints");
+    $("refresh").onclick = () => { loadStats(); showTab(currentTab); };
+    $("hours").onchange = () => showTab(currentTab);
+    $("add-deploy").onclick = async () => {
+      await api("/v1/deploys", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ version: "manual-" + new Date().toISOString(), git_sha: "ui" })
+      });
+      loadDeploys();
+    };
 
     loadStats();
-    loadEndpoints();
-    setInterval(() => { loadStats(); }, 5000);
+    showTab("endpoints");
+    setInterval(loadStats, 5000);
   </script>
 </body>
 </html>

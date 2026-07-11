@@ -13,6 +13,10 @@ require_relative "railspan/middleware/rack"
 require_relative "railspan/instrumentation/action_controller"
 require_relative "railspan/instrumentation/active_record"
 require_relative "railspan/instrumentation/action_view"
+require_relative "railspan/instrumentation/active_job"
+require_relative "railspan/instrumentation/sidekiq"
+require_relative "railspan/instrumentation/cache"
+require_relative "railspan/instrumentation/net_http"
 
 module Railspan
   class << self
@@ -64,6 +68,29 @@ module Railspan
 
     def trace(name, kind: "custom", resource: nil, attributes: {}, &block)
       Tracer.in_span(name: name, kind: kind, resource: resource || name, attributes: attributes, &block)
+    end
+
+    # Record a deploy marker on the Railspan server.
+    def record_deploy!(git_sha: nil, version: nil, metadata: {})
+      require "net/http"
+      require "json"
+      require "uri"
+      base = config.endpoint.to_s.sub(%r{/\z}, "")
+      uri = URI.parse("#{base}/v1/deploys")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == "https"
+      req = Net::HTTP::Post.new(uri.request_uri)
+      req["Content-Type"] = "application/json"
+      req["Authorization"] = "Bearer #{config.api_key}" if config.api_key && !config.api_key.empty?
+      req.body = JSON.generate({
+        "git_sha" => git_sha,
+        "version" => version,
+        "metadata" => metadata
+      }.compact)
+      http.request(req)
+    rescue StandardError => e
+      warn "[railspan] record_deploy failed: #{e.message}" if ENV["RAILSPAN_DEBUG"]
+      nil
     end
   end
 end
