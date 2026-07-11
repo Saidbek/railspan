@@ -1,0 +1,37 @@
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+*.iml
+
+# Rust
+/target/
+**/target/
+Cargo.lock.bak
+
+# Ruby
+*.gem
+.bundle/
+vendor/bundle/
+tmp/
+log/
+*.rbc
+
+# Node / UI
+node_modules/
+dist/
+ui/dist/
+.vite/
+
+# Local data / env
+data/
+*.db
+*.sqlite
+.env
+.env.*
+!.env.example
+
+# Misc
+*.log
+coverage/
