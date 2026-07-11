@@ -35,3 +35,12 @@ data/
 # Misc
 *.log
 coverage/
+
+# Rails dummy
+examples/dummy_rails/log/*
+examples/dummy_rails/tmp/*
+examples/dummy_rails/storage/*.sqlite3*
+examples/dummy_rails/.bundle/
+examples/dummy_rails/vendor/bundle/
+!examples/dummy_rails/log/.keep
+!examples/dummy_rails/tmp/.keep

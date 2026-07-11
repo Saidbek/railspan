@@ -1,0 +1,10 @@
+[package]
+name = "railspan-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Railspan query API and storage (stub until E3)"
+
+[dependencies]
+anyhow = { workspace = true }
+tracing = { workspace = true }

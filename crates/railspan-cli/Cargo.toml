@@ -1,0 +1,20 @@
+[package]
+name = "railspan-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Railspan command-line interface"
+default-run = "railspan"
+
+[[bin]]
+name = "railspan"
+path = "src/main.rs"
+
+[dependencies]
+railspan-agent = { workspace = true }
+railspan-server = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
