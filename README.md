@@ -4,14 +4,15 @@
 
 > Not a Datadog clone. A focused performance product for Ruby on Rails teams.
 
-**Status:** Phase 0 + Phase 1 in progress (gem instrumentation + agent ingest). Storage/UI (E3) next.
+**Status:** Vertical slice live — gem → serve (ingest + SQLite + UI). N+1/jobs (E4) next.
 
 ## Quick start
 
-### 1. Run the agent
+### 1. Run Railspan (ingest + UI)
 
 ```bash
-cargo run -p railspan-cli -- serve --addr 127.0.0.1:7421
+cargo run -p railspan-cli -- serve --addr 127.0.0.1:7421 --data-dir ./data
+# UI:      open http://127.0.0.1:7421
 # health: curl http://127.0.0.1:7421/healthz
 ```
 
@@ -95,10 +96,10 @@ railspan/
 | Action View spans | ✅ (when views render) |
 | PII scrubber | ✅ |
 | Stdout exporter | ✅ |
-| HTTP batch export to agent | ✅ |
-| Agent `POST /v1/traces` | ✅ |
-| Agent health metrics | ✅ |
-| Persistence / UI | ⏳ E3 |
+| HTTP batch export | ✅ |
+| `railspan serve` ingest + SQLite | ✅ |
+| Query API (endpoints / traces / detail) | ✅ |
+| Embedded UI (endpoints + waterfall) | ✅ |
 | N+1 detector / Sidekiq | ⏳ E4 |
 
 ## Docs

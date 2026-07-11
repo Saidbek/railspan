@@ -3,11 +3,9 @@
 default:
     @just --list
 
-# Build all Rust crates
 build:
     cargo build --workspace
 
-# Test Rust + Ruby
 test: test-rust test-gem
 
 test-rust:
@@ -16,9 +14,8 @@ test-rust:
 test-gem:
     cd gem/railspan && bundle install --quiet && bundle exec rake test
 
-# Run agent on default port
 serve:
-    cargo run -p railspan-cli -- serve --addr 127.0.0.1:7421
+    cargo run -p railspan-cli -- serve --addr 127.0.0.1:7421 --data-dir ./data
 
 fmt:
     cargo fmt --all
@@ -26,6 +23,5 @@ fmt:
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 
-# Boot dummy Rails (requires bundle install in examples/dummy_rails)
 dummy-rails:
-    cd examples/dummy_rails && bundle exec rails server -p 3000
+    cd examples/dummy_rails && RAILSPAN_EXPORTER=http RAILSPAN_ENDPOINT=http://127.0.0.1:7421 bundle exec rails server -p 3000

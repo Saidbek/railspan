@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
-use railspan_agent::{serve, AgentMetrics, AgentState};
+use railspan_server::ServeConfig;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::path::PathBuf;
 use tracing::info;
 
 #[derive(Parser, Debug)]
@@ -13,19 +13,24 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Run agent ingest (and later UI/server in one process)
+    /// Run ingest + storage + UI in one process
     Serve {
-        /// Ingest listen address
+        /// Listen address (ingest, API, UI)
         #[arg(long, env = "RAILSPAN_INGEST_ADDR", default_value = "127.0.0.1:7421")]
         addr: SocketAddr,
+        /// Directory for SQLite data
+        #[arg(long, env = "RAILSPAN_DATA_DIR", default_value = "./data")]
+        data_dir: PathBuf,
         /// Optional API key for ingest (Bearer)
         #[arg(long, env = "RAILSPAN_API_KEY")]
         api_key: Option<String>,
     },
-    /// Agent-only mode (alias of serve for now)
+    /// Alias of serve
     Agent {
         #[arg(long, env = "RAILSPAN_INGEST_ADDR", default_value = "127.0.0.1:7421")]
         addr: SocketAddr,
+        #[arg(long, env = "RAILSPAN_DATA_DIR", default_value = "./data")]
+        data_dir: PathBuf,
         #[arg(long, env = "RAILSPAN_API_KEY")]
         api_key: Option<String>,
     },
@@ -42,14 +47,23 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Commands::Serve { addr, api_key } | Commands::Agent { addr, api_key } => {
-            info!(%addr, "starting railspan serve (agent ingest)");
-            let _ = railspan_server::placeholder();
-            let state = AgentState {
+        Commands::Serve {
+            addr,
+            data_dir,
+            api_key,
+        }
+        | Commands::Agent {
+            addr,
+            data_dir,
+            api_key,
+        } => {
+            info!(%addr, data_dir = %data_dir.display(), "starting railspan serve");
+            railspan_server::serve(ServeConfig {
+                addr,
+                data_dir,
                 api_key,
-                metrics: Arc::new(AgentMetrics::default()),
-            };
-            serve(addr, state).await?;
+            })
+            .await?;
         }
     }
     Ok(())
