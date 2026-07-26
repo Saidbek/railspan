@@ -26,6 +26,14 @@ This is **not** full request overhead; it guards the span hot path.
 3. Repeat with `RAILSPAN_ENABLED=1` and `RAILSPAN_EXPORTER=http`.
 4. Compare p50/p95.
 
+**Mixed production-like traffic** (health + list + show + N+1):
+
+```bash
+# requires railspan serve + dummy_rails running
+just load-test 45 12
+just load-flood 30 40   # pressure / adaptive sampling
+```
+
 **Budget:** p95 regression ideally &lt; ~2% at `sample_rate=0.1`–`1.0` depending on SQL span volume.
 
 | Lever | Effect |

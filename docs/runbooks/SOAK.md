@@ -20,12 +20,18 @@ Instrument `examples/dummy_rails` (or a staging app) with HTTP export to the soa
 Generate continuous light traffic:
 
 ```bash
-# example: every second hit endpoints including N+1 seed
+# simple loop
 while true; do
   curl -s -o /dev/null http://127.0.0.1:3000/users
   curl -s -o /dev/null http://127.0.0.1:3000/users/with_posts
   sleep 1
 done
+
+# or production-like mixed load (preferred)
+just load-test 60 12
+# flood / adaptive-sampling probe
+just load-flood 30 40
+# see scripts/load_test.rb --help
 ```
 
 ## Checklist (fill during/after 24h)
