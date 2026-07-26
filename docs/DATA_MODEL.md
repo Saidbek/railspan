@@ -73,6 +73,9 @@ erDiagram
     uint32 repeat_count
     int64 total_duration_ns
     timestamp detected_at
+    string code_filepath
+    int code_lineno
+    string code_function
   }
 
   DEPLOY_MARKER {
@@ -98,6 +101,16 @@ erDiagram
 | `http.client` | Net::HTTP / Faraday | `GET api.stripe.com` |
 | `job` | ActiveJob / Sidekiq | `SendWelcomeEmail` |
 | `custom` | Manual API | user-defined |
+
+## Code location attributes
+
+High-value spans (`sql`, `cache`, `http.client`, `custom` by default) may include:
+
+- `code.filepath` — app-relative path  
+- `code.lineno` — 1-based line  
+- `code.function` — Ruby method / label  
+
+Stored inside `SPAN.attributes` JSON. N+1 rows denormalize the first location for the repeated fingerprint. Design notes: [SOURCE_LOCATIONS.md](./SOURCE_LOCATIONS.md).
 
 ## Core attributes (span.attributes)
 

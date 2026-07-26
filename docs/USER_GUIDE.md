@@ -71,6 +71,7 @@ Railspan.record_deploy!(git_sha: ENV["GIT_SHA"], version: ENV["APP_VERSION"])
 | `--retention-days` | `RAILSPAN_RETENTION_DAYS` | `7` |
 | `--n1-threshold` | `RAILSPAN_N1_THRESHOLD` | `5` |
 | `--log-format` | `RAILSPAN_LOG_FORMAT` | `text` (`json` supported) |
+| `--source-root` | `RAILSPAN_SOURCE_ROOT` | none (code highlight off) |
 
 ### Auth
 
@@ -84,6 +85,27 @@ Railspan.record_deploy!(git_sha: ENV["GIT_SHA"], version: ENV["APP_VERSION"])
 - **Server:** always keeps error and slow roots; other traces kept with probability `sample_rate`.
 - **Adaptive advice:** ingest responses include `advice.sample_rate` under load; the gem may lower client head-sampling.
 - **Gem head sampling:** `sample_rate` can skip instrumenting some requests/jobs entirely.
+
+### Source locations & code highlight
+
+The gem attributes SQL / cache / HTTP client / custom spans to **application** `file:line` (`code.filepath`, `code.lineno`, `code.function`). N+1 events inherit the first location for the repeated query.
+
+**Gem**
+
+| Setting / ENV | Default |
+|---------------|---------|
+| `capture_source_location` / `RAILSPAN_CAPTURE_SOURCE_LOCATION` | `true` |
+| `source_location_kinds` / `RAILSPAN_SOURCE_LOCATION_KINDS` | `sql,cache,http.client,custom` |
+| `application_root` / `RAILSPAN_APPLICATION_ROOT` | `Rails.root` when present |
+
+**Server:** set `--source-root` to the Rails app directory so the UI can open snippets via `GET /api/v1/source`. Without it, path:line still shows; highlight is unavailable.
+
+```bash
+railspan serve --source-root ./examples/dummy_rails
+# UI: open a trace → click a SQL span → code panel
+```
+
+Design notes: [SOURCE_LOCATIONS.md](./SOURCE_LOCATIONS.md).
 
 ### Hardening
 
@@ -104,6 +126,7 @@ Railspan.record_deploy!(git_sha: ENV["GIT_SHA"], version: ENV["APP_VERSION"])
 | GET | `/api/v1/traces?resource=&hours=24` |
 | GET | `/api/v1/traces/:id` |
 | GET | `/api/v1/n-plus-one` |
+| GET | `/api/v1/source?path=&line=&context=` |
 | GET | `/api/v1/deploys` |
 | GET | `/api/v1/stats` |
 | GET | `/` UI |

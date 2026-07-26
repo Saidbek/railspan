@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Line-level source attribution on SQL/cache/HTTP client/custom spans (`code.filepath`, `code.lineno`, `code.function`)
+- N+1 events store first code location for the repeated fingerprint
+- `GET /api/v1/source` + `--source-root` for UI code highlight
+- Waterfall span detail panel with highlighted source snippet
+- Design doc: [docs/SOURCE_LOCATIONS.md](docs/SOURCE_LOCATIONS.md)
+
 ## 0.1.1 — 2026-07-18
 
 ### Added (Phase 5 — production hardening)

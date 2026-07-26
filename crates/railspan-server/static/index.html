@@ -37,7 +37,10 @@
     .panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
     .empty { color: var(--muted); padding: 2rem; text-align: center; border: 1px dashed var(--border); border-radius: 10px; }
     .empty code { display: block; text-align: left; background: #0c1016; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 0.75rem; overflow-x: auto; font-size: 0.85rem; color: #c8d4e6; }
-    .wf-row { display: grid; grid-template-columns: 240px 90px 1fr; gap: 0.5rem; align-items: center; margin: 0.25rem 0; font-size: 0.85rem; }
+    .wf-row { display: grid; grid-template-columns: 240px 90px 1fr; gap: 0.5rem; align-items: center; margin: 0.25rem 0; font-size: 0.85rem;
+      cursor: pointer; border-radius: 4px; padding: 0.1rem 0.2rem; }
+    .wf-row:hover { background: rgba(91,159,212,0.06); }
+    .wf-row.selected { background: rgba(91,159,212,0.12); outline: 1px solid var(--border); }
     .wf-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; }
     .wf-bar-wrap { position: relative; height: 18px; background: #121a24; border-radius: 4px; overflow: hidden; }
     .wf-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; min-width: 2px; }
@@ -50,6 +53,19 @@
     .n1-box { border-left: 3px solid var(--n1); padding: 0.5rem 0.75rem; margin: 0.4rem 0; background: rgba(255,138,101,0.08); border-radius: 0 6px 6px 0; font-size: 0.88rem; }
     .deploy-line { height: 2px; background: var(--accent); margin: 0.5rem 0; position: relative; }
     .deploy-line span { position: absolute; top: -1.1rem; font-size: 0.75rem; color: var(--accent); white-space: nowrap; }
+    .code-loc { color: var(--accent); font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; }
+    .span-detail { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+    .span-detail h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .attr-grid { display: grid; grid-template-columns: 160px 1fr; gap: 0.25rem 0.75rem; font-size: 0.82rem; margin: 0.5rem 0 0.75rem; }
+    .attr-grid .k { color: var(--muted); font-family: ui-monospace, Menlo, monospace; }
+    .attr-grid .v { font-family: ui-monospace, Menlo, monospace; word-break: break-all; }
+    .code-block { background: #0c1016; border: 1px solid var(--border); border-radius: 8px; overflow: auto; max-height: 320px; font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; line-height: 1.45; }
+    .code-block table { width: 100%; border: none; background: transparent; border-radius: 0; }
+    .code-block td { border: none; padding: 0 0.6rem; vertical-align: top; }
+    .code-block .ln { color: var(--muted); text-align: right; user-select: none; width: 3rem; }
+    .code-block tr.hl td { background: rgba(91,159,212,0.18); }
+    .code-block tr.hl .ln { color: var(--accent); font-weight: 600; }
+    .code-miss { color: var(--muted); font-size: 0.82rem; margin-top: 0.4rem; }
   </style>
 </head>
 <body>
@@ -115,6 +131,7 @@ Railspan.configure { |c| c.endpoint = "http://127.0.0.1:7421"; c.exporter = :htt
         <div class="meta" id="trace-meta"></div>
         <div id="trace-n1"></div>
         <div id="waterfall" style="margin-top:1rem"></div>
+        <div id="span-detail" class="span-detail hidden"></div>
       </div>
       <div class="panel">
         <h2>Traces</h2>
@@ -245,13 +262,17 @@ Railspan.configure { |c| c.endpoint = "http://127.0.0.1:7421"; c.exporter = :htt
       const el = $("n1-list");
       const events = data.events || [];
       if (!events.length) { el.innerHTML = `<div class="empty">No N+1 events in range</div>`; return; }
-      el.innerHTML = events.map(e => `
+      el.innerHTML = events.map(e => {
+        const loc = formatCodeLoc(e.code_filepath, e.code_lineno, e.code_function);
+        return `
         <div class="n1-box" style="cursor:pointer" data-tid="${esc(e.trace_id)}">
           <strong>${esc(e.root_resource||"trace")}</strong>
           · ${e.repeat_count}× · ${fmtMs(e.total_duration_ms)}
           <div class="num meta">${esc(e.sql_fingerprint)}</div>
+          ${loc ? `<div class="code-loc">${esc(loc)}</div>` : ""}
           <div class="meta">${fmtTime(e.detected_at_ns)} · ${e.trace_id.slice(0,12)}…</div>
-        </div>`).join("");
+        </div>`;
+      }).join("");
       el.querySelectorAll("[data-tid]").forEach(n => n.onclick = () => {
         selectedResource = null;
         showTraceOnly(n.dataset.tid);
@@ -322,29 +343,111 @@ Railspan.configure { |c| c.endpoint = "http://127.0.0.1:7421"; c.exporter = :htt
         ${t.has_n_plus_one ? '<span class="badge n1">N+1</span>' : ''} ·
         ${t.span_count} spans · ${fmtTime(t.start_time_ns)}`;
       const n1 = detail.n_plus_one || [];
-      $("trace-n1").innerHTML = n1.map(e =>
-        `<div class="n1-box"><strong>N+1</strong> ${e.repeat_count}× ${fmtMs(e.total_duration_ms)}
-         <div class="num">${esc(e.sql_fingerprint)}</div></div>`).join("");
+      $("trace-n1").innerHTML = n1.map(e => {
+        const loc = formatCodeLoc(e.code_filepath, e.code_lineno, e.code_function);
+        return `<div class="n1-box"><strong>N+1</strong> ${e.repeat_count}× ${fmtMs(e.total_duration_ms)}
+         <div class="num">${esc(e.sql_fingerprint)}</div>
+         ${loc ? `<div class="code-loc" data-path="${esc(e.code_filepath||"")}" data-line="${e.code_lineno||""}">${esc(loc)}</div>` : ""}
+         </div>`;
+      }).join("");
+      $("trace-n1").querySelectorAll(".code-loc[data-path]").forEach(el => {
+        el.style.cursor = "pointer";
+        el.onclick = () => showSourceOnly(el.dataset.path, Number(el.dataset.line) || 1);
+      });
       renderWaterfall(detail.spans || []);
+      $("span-detail").classList.add("hidden");
+      $("span-detail").innerHTML = "";
+    }
+
+    function formatCodeLoc(path, line, fn) {
+      if (!path) return "";
+      let s = path + (line ? ":" + line : "");
+      if (fn) s += " in " + fn;
+      return s;
+    }
+
+    function codeAttrs(span) {
+      const a = span.attributes || {};
+      return {
+        path: a["code.filepath"] || a.code_filepath,
+        line: a["code.lineno"] || a.code_lineno,
+        fn: a["code.function"] || a.code_function
+      };
     }
 
     function renderWaterfall(spans) {
       const el = $("waterfall");
+      window.__wfSpans = spans;
       if (!spans.length) { el.innerHTML = "<div class='meta'>No spans</div>"; return; }
       const minStart = Math.min(...spans.map(s => s.start_ns));
       const maxEnd = Math.max(...spans.map(s => s.start_ns + s.duration_ns));
       const total = Math.max(maxEnd - minStart, 1);
-      el.innerHTML = spans.map(s => {
+      el.innerHTML = spans.map((s, i) => {
         const left = ((s.start_ns - minStart) / total) * 100;
         const width = Math.max((s.duration_ns / total) * 100, 0.3);
         const label = s.resource || s.name;
         const k = "k-" + (s.kind || "custom").replace(/[^a-z0-9.]+/gi, "");
-        return `<div class="wf-row">
-          <div class="wf-label" title="${esc(label)}">${esc(trunc(label, 38))}</div>
+        const c = codeAttrs(s);
+        const loc = formatCodeLoc(c.path, c.line, null);
+        return `<div class="wf-row" data-idx="${i}" title="${esc(label)}${loc ? " — " + esc(loc) : ""}">
+          <div class="wf-label">${esc(trunc(label, 32))}${loc ? `<div class="code-loc">${esc(trunc(loc, 36))}</div>` : ""}</div>
           <div class="num">${fmtMs(s.duration_ms)}</div>
           <div class="wf-bar-wrap"><div class="wf-bar ${k}" style="left:${left}%;width:${width}%"></div></div>
         </div>`;
       }).join("");
+      el.querySelectorAll(".wf-row[data-idx]").forEach(row => {
+        row.onclick = () => selectSpan(Number(row.dataset.idx));
+      });
+    }
+
+    async function selectSpan(idx) {
+      const spans = window.__wfSpans || [];
+      const s = spans[idx];
+      if (!s) return;
+      document.querySelectorAll(".wf-row").forEach(r => r.classList.toggle("selected", Number(r.dataset.idx) === idx));
+      const panel = $("span-detail");
+      panel.classList.remove("hidden");
+      const c = codeAttrs(s);
+      const loc = formatCodeLoc(c.path, c.line, c.fn);
+      const attrs = s.attributes || {};
+      const keys = Object.keys(attrs).filter(k => !k.startsWith("code.")).slice(0, 24);
+      let attrHtml = keys.map(k =>
+        `<div class="k">${esc(k)}</div><div class="v">${esc(String(attrs[k]).slice(0, 300))}</div>`
+      ).join("");
+      panel.innerHTML = `
+        <h3>${esc(s.kind || "span")} · ${esc(s.resource || s.name)} · ${fmtMs(s.duration_ms)}</h3>
+        <div class="meta">span <span class="num">${esc(s.span_id)}</span>${s.status === "error" ? ' · <span class="badge err">error</span>' : ""}</div>
+        ${loc ? `<div class="code-loc" style="margin-top:0.4rem">${esc(loc)}</div>` : `<div class="meta" style="margin-top:0.4rem">No code location on this span</div>`}
+        ${attrHtml ? `<div class="attr-grid">${attrHtml}</div>` : ""}
+        <div id="code-snippet"></div>`;
+      if (c.path) await renderCodeSnippet(c.path, Number(c.line) || 1);
+    }
+
+    async function showSourceOnly(path, line) {
+      const panel = $("span-detail");
+      panel.classList.remove("hidden");
+      panel.innerHTML = `<h3>Source</h3><div class="code-loc">${esc(formatCodeLoc(path, line))}</div><div id="code-snippet"></div>`;
+      await renderCodeSnippet(path, line);
+    }
+
+    async function renderCodeSnippet(path, line) {
+      const host = $("code-snippet");
+      if (!host) return;
+      try {
+        const q = new URLSearchParams({ path, line: String(line || 1), context: "6" });
+        const data = await api(`/api/v1/source?${q}`);
+        const start = data.start_line || 1;
+        const focus = data.line || line;
+        const rows = (data.lines || []).map((text, i) => {
+          const ln = start + i;
+          const hl = ln === focus ? ' class="hl"' : "";
+          return `<tr${hl}><td class="ln">${ln}</td><td>${esc(text)}</td></tr>`;
+        }).join("");
+        host.innerHTML = `<div class="code-block"><table>${rows}</table></div>`;
+      } catch (e) {
+        host.innerHTML = `<div class="code-miss">Code snippet unavailable (${esc(String(e.message || e))}).
+          Set <code>--source-root</code> / <code>RAILSPAN_SOURCE_ROOT</code> to your app path for highlight.</div>`;
+      }
     }
 
     function showTab(tab) {

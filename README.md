@@ -40,11 +40,13 @@ curl localhost:3000/users/with_posts   # triggers N+1
 | Sampling + retention | ✅ |
 | UI/API auth + adaptive sampling | ✅ |
 | Overhead bench + soak/security docs | ✅ |
+| Source locations + code highlight | ✅ |
 | OTLP / ClickHouse | ⏳ future |
 
 ## Docs
 
 - [User guide](docs/USER_GUIDE.md)
+- [Source locations](docs/SOURCE_LOCATIONS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Plan](docs/PLAN.md)
 - [Backlog](docs/BACKLOG.md)

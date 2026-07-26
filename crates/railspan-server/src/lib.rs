@@ -60,6 +60,8 @@ pub struct AppState {
     pub metrics: Arc<ServerMetrics>,
     pub sample_rate: f64,
     pub slow_ms: u64,
+    /// Optional app checkout root for `GET /api/v1/source` code highlight.
+    pub source_root: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +74,8 @@ pub struct ServeConfig {
     pub slow_ms: u64,
     pub retention_days: u64,
     pub n1_threshold: u32,
+    /// Local path to application source for UI code snippets.
+    pub source_root: Option<PathBuf>,
 }
 
 impl Default for ServeConfig {
@@ -85,6 +89,7 @@ impl Default for ServeConfig {
             slow_ms: 500,
             retention_days: 7,
             n1_threshold: 5,
+            source_root: None,
         }
     }
 }
@@ -101,6 +106,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/v1/n-plus-one", get(list_n_plus_one))
         .route("/api/v1/deploys", get(list_deploys))
         .route("/api/v1/stats", get(stats))
+        .route("/api/v1/source", get(get_source))
         .layer(from_fn_with_state(state.clone(), ui_auth_middleware))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
@@ -118,6 +124,15 @@ pub async fn serve(config: ServeConfig) -> anyhow::Result<()> {
         .clone()
         .or_else(|| config.api_key.clone())
         .filter(|s| !s.is_empty());
+    let source_root = config.source_root.and_then(|p| {
+        let canon = std::fs::canonicalize(&p).unwrap_or(p);
+        if canon.is_dir() {
+            Some(canon)
+        } else {
+            warn!(path = %canon.display(), "source_root is not a directory; source API disabled");
+            None
+        }
+    });
     let state = AppState {
         store: store.clone(),
         api_key: config.api_key.clone().filter(|s| !s.is_empty()),
@@ -128,6 +143,7 @@ pub async fn serve(config: ServeConfig) -> anyhow::Result<()> {
         }),
         sample_rate: config.sample_rate.clamp(0.0, 1.0),
         slow_ms: config.slow_ms,
+        source_root,
     };
 
     // Retention worker — hourly TTL so disk stays bounded.
@@ -155,6 +171,11 @@ pub async fn serve(config: ServeConfig) -> anyhow::Result<()> {
         retention_days,
         ui_auth = state.ui_token.is_some(),
         ingest_auth = state.api_key.is_some(),
+        source_root = state
+            .source_root
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "(none)".into()),
         "railspan serve listening"
     );
     axum::serve(listener, app(state)).await?;
@@ -318,7 +339,10 @@ fn sample_batch(batch: TraceBatch, sample_rate: f64, slow_ms: u64) -> (TraceBatc
     // Group by trace_id; keep whole traces if error/slow or sampled
     let mut by_trace: HashMap<String, Vec<Span>> = HashMap::new();
     for span in batch.spans {
-        by_trace.entry(span.trace_id.clone()).or_default().push(span);
+        by_trace
+            .entry(span.trace_id.clone())
+            .or_default()
+            .push(span);
     }
     let mut kept = Vec::new();
     let mut dropped = 0usize;
@@ -326,11 +350,7 @@ fn sample_batch(batch: TraceBatch, sample_rate: f64, slow_ms: u64) -> (TraceBatc
         let root = spans.iter().find(|s| s.parent_span_id.is_none());
         let is_error = spans.iter().any(|s| s.status == "error");
         let duration_ms = root
-            .map(|s| {
-                s.end_time_unix_ns
-                    .saturating_sub(s.start_time_unix_ns) as f64
-                    / 1_000_000.0
-            })
+            .map(|s| s.end_time_unix_ns.saturating_sub(s.start_time_unix_ns) as f64 / 1_000_000.0)
             .unwrap_or(0.0);
         let keep = is_error
             || duration_ms >= slow_ms as f64
@@ -395,7 +415,10 @@ async fn ingest_traces(
     })?;
 
     if batch.protocol_version != PROTOCOL_VERSION {
-        warn!(version = batch.protocol_version, "unsupported protocol version");
+        warn!(
+            version = batch.protocol_version,
+            "unsupported protocol version"
+        );
         state
             .metrics
             .batches_rejected
@@ -541,7 +564,107 @@ async fn list_endpoints(
         warn!(error = %e, "list_endpoints failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    Ok(Json(serde_json::json!({ "endpoints": endpoints, "from_ns": from, "to_ns": to })))
+    Ok(Json(
+        serde_json::json!({ "endpoints": endpoints, "from_ns": from, "to_ns": to }),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SourceQuery {
+    /// Path relative to source_root (e.g. app/controllers/users_controller.rb)
+    pub path: String,
+    pub line: Option<i64>,
+    /// Context lines above/below (default 5, max 20)
+    #[serde(default = "default_context")]
+    pub context: u32,
+}
+
+fn default_context() -> u32 {
+    5
+}
+
+const MAX_SOURCE_BYTES: u64 = 512 * 1024;
+
+/// Read a snippet of application source for UI code highlight.
+/// Requires `--source-root` / `RAILSPAN_SOURCE_ROOT`. Hardened against path traversal.
+async fn get_source(
+    State(state): State<AppState>,
+    Query(q): Query<SourceQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let Some(root) = state.source_root.as_ref() else {
+        return Err(StatusCode::NOT_FOUND);
+    };
+
+    let rel = q.path.trim().trim_start_matches('/');
+    if rel.is_empty() || rel.contains('\0') {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    // Reject parent traversal in the logical path before join.
+    if rel.split('/').any(|p| p == "..") {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let ext_ok = matches!(
+        std::path::Path::new(rel)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or(""),
+        "rb" | "rake" | "arb" | "ruby" | "ru" | "rabl" | "jbuilder"
+    );
+    if !ext_ok {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let candidate = root.join(rel);
+    let canon = match std::fs::canonicalize(&candidate) {
+        Ok(p) => p,
+        Err(_) => return Err(StatusCode::NOT_FOUND),
+    };
+    if !canon.starts_with(root) {
+        warn!(path = %canon.display(), "source path escaped root");
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if !canon.is_file() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let meta = std::fs::metadata(&canon).map_err(|_| StatusCode::NOT_FOUND)?;
+    if meta.len() > MAX_SOURCE_BYTES {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    let content = tokio::fs::read_to_string(&canon)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    let all_lines: Vec<&str> = content.lines().collect();
+    let total = all_lines.len();
+    if total == 0 {
+        return Ok(Json(serde_json::json!({
+            "path": rel,
+            "line": q.line,
+            "start_line": 1,
+            "language": "ruby",
+            "lines": [],
+            "source_root_configured": true,
+        })));
+    }
+
+    let focus = q.line.unwrap_or(1).clamp(1, total as i64) as usize;
+    let ctx = q.context.min(20) as usize;
+    let start = focus.saturating_sub(1).saturating_sub(ctx);
+    let end = (focus.saturating_sub(1) + ctx + 1).min(total);
+    let lines: Vec<String> = all_lines[start..end]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    Ok(Json(serde_json::json!({
+        "path": rel,
+        "line": focus as i64,
+        "start_line": (start + 1) as i64,
+        "language": "ruby",
+        "lines": lines,
+        "source_root_configured": true,
+    })))
 }
 
 #[derive(Debug, Deserialize)]
@@ -592,7 +715,9 @@ async fn list_traces(
             warn!(error = %e, "list_traces failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    Ok(Json(serde_json::json!({ "traces": traces, "from_ns": from, "to_ns": to })))
+    Ok(Json(
+        serde_json::json!({ "traces": traces, "from_ns": from, "to_ns": to }),
+    ))
 }
 
 async fn get_trace(
@@ -668,12 +793,7 @@ mod tests {
 
     async fn test_state() -> AppState {
         AppState {
-            store: Arc::new(
-                Store::open_in_memory()
-                    .await
-                    .unwrap()
-                    .with_n1_threshold(5),
-            ),
+            store: Arc::new(Store::open_in_memory().await.unwrap().with_n1_threshold(5)),
             api_key: Some("secret".into()),
             ui_token: Some("secret".into()),
             metrics: Arc::new(ServerMetrics {
@@ -682,6 +802,7 @@ mod tests {
             }),
             sample_rate: 1.0,
             slow_ms: 500,
+            source_root: None,
         }
     }
 
@@ -689,7 +810,12 @@ mod tests {
     async fn healthz_ok() {
         let app = app(test_state().await);
         let res = app
-            .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
@@ -871,5 +997,54 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn source_snippet_from_root() {
+        let dir = std::env::temp_dir().join(format!("railspan_src_{}", now_secs()));
+        std::fs::create_dir_all(dir.join("app/controllers")).unwrap();
+        let file = dir.join("app/controllers/users_controller.rb");
+        std::fs::write(
+            &file,
+            "class UsersController\n  def with_posts\n    User.all\n  end\nend\n",
+        )
+        .unwrap();
+        let root = std::fs::canonicalize(&dir).unwrap();
+
+        let mut state = test_state().await;
+        state.source_root = Some(root);
+
+        let res = app(state.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/source?path=app/controllers/users_controller.rb&line=2&context=1")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["line"], 2);
+        assert!(json["lines"].as_array().unwrap().len() >= 2);
+
+        // Path traversal rejected
+        let res = app(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/source?path=../../etc/passwd&line=1")
+                    .header("authorization", "Bearer secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

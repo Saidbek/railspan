@@ -38,6 +38,14 @@ module Railspan
       tid = trace_id || parent_span&.trace_id || generate_trace_id
       parent_id = parent_span&.span_id
 
+      attrs = attributes.each_with_object({}) { |(k, v), h| h[k.to_s] = v }
+      if Railspan.config.source_location_for_kind?(kind) &&
+         !attrs.key?("code.filepath")
+        # skip: start_span -> in_span/instrumentation; CallerLocation skips gem frames
+        loc = CallerLocation.capture(skip: 2)
+        attrs.merge!(loc) if loc
+      end
+
       span = Span.new(
         trace_id: tid,
         span_id: generate_span_id,
@@ -45,7 +53,7 @@ module Railspan
         name: name,
         kind: kind,
         resource: resource,
-        attributes: attributes
+        attributes: attrs
       )
       Context.push(span)
       span

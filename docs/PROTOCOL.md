@@ -87,6 +87,18 @@ Default agent listen: `127.0.0.1:4318` (avoid colliding with OTLP 4317/4318 care
 }
 ```
 
+### Code location attributes (line-level attribution)
+
+For kinds `sql`, `cache`, `http.client`, and `custom` (configurable), the gem may attach OpenTelemetry-aligned attributes:
+
+| Attribute | Type | Example |
+|-----------|------|---------|
+| `code.filepath` | string | `app/controllers/users_controller.rb` |
+| `code.lineno` | number | `18` |
+| `code.function` | string | `with_posts` |
+
+See [SOURCE_LOCATIONS.md](./SOURCE_LOCATIONS.md). Paths are preferably relative to `Rails.root`.
+
 ### Status
 
 - `ok`
@@ -156,6 +168,7 @@ Prefix: `/api/v1`
 | GET | `/traces` | Search traces |
 | GET | `/traces/:trace_id` | Trace detail + spans |
 | GET | `/n-plus-one` | N+1 events |
+| GET | `/source` | Code snippet for highlight (`path`, `line`, `context`) |
 | GET | `/deploys` | Deploy markers |
 | POST | `/deploys` | Record deploy |
 | GET | `/health` | Liveness |

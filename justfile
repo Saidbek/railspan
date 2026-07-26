@@ -16,7 +16,7 @@ test-gem:
     cd gem/railspan && bundle install --quiet && bundle exec rake test
 
 serve:
-    cargo run -p railspan-cli -- serve --addr 127.0.0.1:7421 --data-dir ./data
+    cargo run -p railspan-cli -- serve --addr 127.0.0.1:7421 --data-dir ./data --source-root ./examples/dummy_rails
 
 fmt:
     cargo fmt --all

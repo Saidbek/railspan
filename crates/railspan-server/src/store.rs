@@ -72,6 +72,13 @@ pub struct NPlusOneEvent {
     pub total_duration_ns: i64,
     pub total_duration_ms: f64,
     pub detected_at_ns: i64,
+    /// First app code location seen on SQL spans for this fingerprint (if any).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_filepath: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_lineno: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_function: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -177,7 +184,10 @@ impl Store {
                 sql_fingerprint TEXT NOT NULL,
                 repeat_count INTEGER NOT NULL,
                 total_duration_ns INTEGER NOT NULL,
-                detected_at_ns INTEGER NOT NULL
+                detected_at_ns INTEGER NOT NULL,
+                code_filepath TEXT,
+                code_lineno INTEGER,
+                code_function TEXT
             )"#,
             r#"CREATE INDEX IF NOT EXISTS idx_n1_time ON n_plus_one_events(detected_at_ns DESC)"#,
             r#"CREATE INDEX IF NOT EXISTS idx_n1_trace ON n_plus_one_events(trace_id)"#,
@@ -194,10 +204,20 @@ impl Store {
             sqlx::query(stmt).execute(&self.pool).await?;
         }
         // Best-effort column adds for upgrades
-        let _ = sqlx::query("ALTER TABLE traces ADD COLUMN has_n_plus_one INTEGER NOT NULL DEFAULT 0")
+        let _ =
+            sqlx::query("ALTER TABLE traces ADD COLUMN has_n_plus_one INTEGER NOT NULL DEFAULT 0")
+                .execute(&self.pool)
+                .await;
+        let _ = sqlx::query("ALTER TABLE traces ADD COLUMN root_kind TEXT")
             .execute(&self.pool)
             .await;
-        let _ = sqlx::query("ALTER TABLE traces ADD COLUMN root_kind TEXT")
+        let _ = sqlx::query("ALTER TABLE n_plus_one_events ADD COLUMN code_filepath TEXT")
+            .execute(&self.pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE n_plus_one_events ADD COLUMN code_lineno INTEGER")
+            .execute(&self.pool)
+            .await;
+        let _ = sqlx::query("ALTER TABLE n_plus_one_events ADD COLUMN code_function TEXT")
             .execute(&self.pool)
             .await;
         Ok(())
@@ -252,7 +272,13 @@ impl Store {
 
             // Detect N+1 from sql spans in this batch + would ideally merge with stored;
             // for MVP detect within the batch's sql spans for this trace.
-            let n1_events = detect_n_plus_one(&trace_id, &root_resource, &spans, self.n1_threshold, received_at);
+            let n1_events = detect_n_plus_one(
+                &trace_id,
+                &root_resource,
+                &spans,
+                self.n1_threshold,
+                received_at,
+            );
             let has_n1 = !n1_events.is_empty();
 
             sqlx::query(
@@ -290,7 +316,9 @@ impl Store {
             .await?;
 
             for span in spans {
-                let duration = span.end_time_unix_ns.saturating_sub(span.start_time_unix_ns) as i64;
+                let duration = span
+                    .end_time_unix_ns
+                    .saturating_sub(span.start_time_unix_ns) as i64;
                 let resource = span.resource.as_ref().map(|r| truncate(r, 1024));
                 let attrs = serde_json::to_string(&span.attributes).unwrap_or_else(|_| "{}".into());
                 let attrs = truncate(&attrs, 16_384);
@@ -331,8 +359,9 @@ impl Store {
                     r#"
                     INSERT INTO n_plus_one_events (
                         id, trace_id, root_resource, sql_fingerprint,
-                        repeat_count, total_duration_ns, detected_at_ns
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        repeat_count, total_duration_ns, detected_at_ns,
+                        code_filepath, code_lineno, code_function
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO NOTHING
                     "#,
                 )
@@ -343,6 +372,9 @@ impl Store {
                 .bind(ev.repeat_count as i64)
                 .bind(ev.total_duration_ns)
                 .bind(ev.detected_at_ns)
+                .bind(&ev.code_filepath)
+                .bind(ev.code_lineno)
+                .bind(&ev.code_function)
                 .execute(&mut *tx)
                 .await?;
             }
@@ -557,7 +589,8 @@ impl Store {
         let rows = sqlx::query(
             r#"
             SELECT id, trace_id, root_resource, sql_fingerprint, repeat_count,
-                   total_duration_ns, detected_at_ns
+                   total_duration_ns, detected_at_ns,
+                   code_filepath, code_lineno, code_function
             FROM n_plus_one_events
             WHERE trace_id = ?
             ORDER BY repeat_count DESC
@@ -569,11 +602,17 @@ impl Store {
         Ok(rows.into_iter().map(map_n1).collect())
     }
 
-    pub async fn list_n_plus_one(&self, from_ns: i64, to_ns: i64, limit: i64) -> Result<Vec<NPlusOneEvent>> {
+    pub async fn list_n_plus_one(
+        &self,
+        from_ns: i64,
+        to_ns: i64,
+        limit: i64,
+    ) -> Result<Vec<NPlusOneEvent>> {
         let rows = sqlx::query(
             r#"
             SELECT id, trace_id, root_resource, sql_fingerprint, repeat_count,
-                   total_duration_ns, detected_at_ns
+                   total_duration_ns, detected_at_ns,
+                   code_filepath, code_lineno, code_function
             FROM n_plus_one_events
             WHERE detected_at_ns >= ? AND detected_at_ns <= ?
             ORDER BY detected_at_ns DESC
@@ -619,7 +658,12 @@ impl Store {
         })
     }
 
-    pub async fn list_deploys(&self, from_ns: i64, to_ns: i64, limit: i64) -> Result<Vec<DeployMarker>> {
+    pub async fn list_deploys(
+        &self,
+        from_ns: i64,
+        to_ns: i64,
+        limit: i64,
+    ) -> Result<Vec<DeployMarker>> {
         let rows = sqlx::query(
             r#"
             SELECT id, git_sha, version, deployed_at_ns, metadata_json
@@ -724,7 +768,38 @@ fn map_n1(row: sqlx::sqlite::SqliteRow) -> NPlusOneEvent {
         total_duration_ns,
         total_duration_ms: ns_to_ms(total_duration_ns),
         detected_at_ns: row.get("detected_at_ns"),
+        code_filepath: row.try_get("code_filepath").ok().flatten(),
+        code_lineno: row.try_get("code_lineno").ok().flatten(),
+        code_function: row.try_get("code_function").ok().flatten(),
     }
+}
+
+#[derive(Default)]
+struct FpAgg {
+    count: u32,
+    total_ns: i64,
+    code_filepath: Option<String>,
+    code_lineno: Option<i64>,
+    code_function: Option<String>,
+}
+
+fn span_code_location(s: &Span) -> (Option<String>, Option<i64>, Option<String>) {
+    let filepath = s
+        .attributes
+        .get("code.filepath")
+        .and_then(|v| v.as_str())
+        .map(|s| truncate(s, 512));
+    let lineno = s.attributes.get("code.lineno").and_then(|v| {
+        v.as_i64()
+            .or_else(|| v.as_u64().map(|u| u as i64))
+            .or_else(|| v.as_f64().map(|f| f as i64))
+    });
+    let function = s
+        .attributes
+        .get("code.function")
+        .and_then(|v| v.as_str())
+        .map(|s| truncate(s, 128));
+    (filepath, lineno, function)
 }
 
 fn detect_n_plus_one(
@@ -734,7 +809,7 @@ fn detect_n_plus_one(
     threshold: u32,
     detected_at: i64,
 ) -> Vec<NPlusOneEvent> {
-    let mut by_fp: HashMap<String, (u32, i64)> = HashMap::new();
+    let mut by_fp: HashMap<String, FpAgg> = HashMap::new();
     for s in spans {
         if s.kind != "sql" {
             continue;
@@ -750,22 +825,38 @@ fn detect_n_plus_one(
             })
             .unwrap_or_else(|| s.name.clone());
         let dur = s.end_time_unix_ns.saturating_sub(s.start_time_unix_ns) as i64;
-        let e = by_fp.entry(fp).or_insert((0, 0));
-        e.0 += 1;
-        e.1 += dur;
+        let e = by_fp.entry(fp).or_default();
+        e.count += 1;
+        e.total_ns += dur;
+        // Keep the first app location for this fingerprint.
+        if e.code_filepath.is_none() {
+            let (path, line, func) = span_code_location(s);
+            if path.is_some() {
+                e.code_filepath = path;
+                e.code_lineno = line;
+                e.code_function = func;
+            }
+        }
     }
     by_fp
         .into_iter()
-        .filter(|(_, (c, _))| *c >= threshold)
-        .map(|(fp, (count, total))| NPlusOneEvent {
-            id: format!("n1_{}_{}", &trace_id[..trace_id.len().min(12)], simple_hash(&fp)),
+        .filter(|(_, agg)| agg.count >= threshold)
+        .map(|(fp, agg)| NPlusOneEvent {
+            id: format!(
+                "n1_{}_{}",
+                &trace_id[..trace_id.len().min(12)],
+                simple_hash(&fp)
+            ),
             trace_id: trace_id.to_string(),
             root_resource: root_resource.clone(),
             sql_fingerprint: truncate(&fp, 1024),
-            repeat_count: count,
-            total_duration_ns: total,
-            total_duration_ms: ns_to_ms(total),
+            repeat_count: agg.count,
+            total_duration_ns: agg.total_ns,
+            total_duration_ms: ns_to_ms(agg.total_ns),
             detected_at_ns: detected_at,
+            code_filepath: agg.code_filepath,
+            code_lineno: agg.code_lineno,
+            code_function: agg.code_function,
         })
         .collect()
 }
@@ -863,7 +954,14 @@ mod tests {
                 start_time_unix_ns: 2_000 + i * 100,
                 end_time_unix_ns: 2_050 + i * 100,
                 status: "ok".into(),
-                attributes: HashMap::new(),
+                attributes: HashMap::from([
+                    (
+                        "code.filepath".into(),
+                        serde_json::json!("app/controllers/users_controller.rb"),
+                    ),
+                    ("code.lineno".into(), serde_json::json!(18)),
+                    ("code.function".into(), serde_json::json!("with_posts")),
+                ]),
                 events: vec![],
             });
         }
@@ -887,6 +985,12 @@ mod tests {
         let n1 = store.list_n_plus_one(0, i64::MAX, 10).await.unwrap();
         assert_eq!(n1.len(), 1);
         assert!(n1[0].repeat_count >= 5);
+        assert_eq!(
+            n1[0].code_filepath.as_deref(),
+            Some("app/controllers/users_controller.rb")
+        );
+        assert_eq!(n1[0].code_lineno, Some(18));
+        assert_eq!(n1[0].code_function.as_deref(), Some("with_posts"));
         let detail = store.get_trace("t1").await.unwrap().unwrap();
         assert!(detail.trace.has_n_plus_one);
         let endpoints = store.list_endpoints(0, i64::MAX).await.unwrap();

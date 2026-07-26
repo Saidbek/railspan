@@ -8,7 +8,12 @@ use tracing::info;
 #[command(name = "railspan", version, about = "Lightweight Rails-first APM")]
 struct Cli {
     /// Log format: text (default) or json for production aggregators
-    #[arg(long, env = "RAILSPAN_LOG_FORMAT", global = true, default_value = "text")]
+    #[arg(
+        long,
+        env = "RAILSPAN_LOG_FORMAT",
+        global = true,
+        default_value = "text"
+    )]
     log_format: LogFormat,
 
     #[command(subcommand)]
@@ -47,6 +52,9 @@ enum Commands {
         /// N+1 detection threshold (identical SQL count)
         #[arg(long, env = "RAILSPAN_N1_THRESHOLD", default_value = "5")]
         n1_threshold: u32,
+        /// Local app source root for UI code highlight (`GET /api/v1/source`)
+        #[arg(long, env = "RAILSPAN_SOURCE_ROOT")]
+        source_root: Option<PathBuf>,
     },
 }
 
@@ -83,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
             slow_ms,
             retention_days,
             n1_threshold,
+            source_root,
         } => {
             info!(%addr, data_dir = %data_dir.display(), "starting railspan serve");
             railspan_server::serve(ServeConfig {
@@ -94,6 +103,7 @@ async fn main() -> anyhow::Result<()> {
                 slow_ms,
                 retention_days,
                 n1_threshold,
+                source_root,
             })
             .await?;
         }

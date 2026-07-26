@@ -82,7 +82,10 @@ async fn ingest_traces(
     }
 
     let count = batch.spans.len();
-    state.metrics.batches_received.fetch_add(1, Ordering::Relaxed);
+    state
+        .metrics
+        .batches_received
+        .fetch_add(1, Ordering::Relaxed);
     state
         .metrics
         .spans_received
