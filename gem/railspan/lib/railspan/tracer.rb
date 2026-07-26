@@ -20,6 +20,17 @@ module Railspan
       SecureRandom.hex(8)
     end
 
+    # Head-based sampling for root operations (requests/jobs).
+    # rate >= 1 always; rate <= 0 never; otherwise probabilistic.
+    def sample_root?(rate: Railspan.config.sample_rate)
+      r = rate.to_f
+      return true if r >= 1.0
+      return false if r <= 0.0
+
+      # Deterministic-enough for low overhead: SecureRandom is fine for client sampling
+      Random.rand < r
+    end
+
     def start_span(name:, kind:, resource: nil, attributes: {}, trace_id: nil, parent: :auto)
       return NullSpan.instance unless Railspan.config.enabled?
 

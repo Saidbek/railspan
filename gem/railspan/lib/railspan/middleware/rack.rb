@@ -10,6 +10,10 @@ module Railspan
       def call(env)
         return @app.call(env) unless Railspan.config.enabled?
         return @app.call(env) if ignore?(env)
+        # Head sampling: under adaptive advice / configured sample_rate, skip some
+        # healthy requests entirely to cut instrumentation cost. Errors on unsampled
+        # requests are not exported (server still keeps errors when spans arrive).
+        return @app.call(env) unless Tracer.sample_root?
 
         method = env["REQUEST_METHOD"]
         path = env["PATH_INFO"].to_s

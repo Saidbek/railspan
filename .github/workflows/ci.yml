@@ -33,3 +33,5 @@ jobs:
       - name: test
         working-directory: gem/railspan
         run: bundle exec rake test
+      - name: overhead microbench
+        run: ruby scripts/bench_overhead.rb 20000

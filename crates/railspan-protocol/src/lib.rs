@@ -66,6 +66,17 @@ pub struct IngestResponse {
     pub accepted_spans: usize,
     #[serde(default)]
     pub dropped_spans: usize,
+    /// Optional backpressure / adaptive sampling advice for the client SDK.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advice: Option<IngestAdvice>,
+}
+
+/// Hints the agent/server can return so the gem can reduce export load.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct IngestAdvice {
+    /// Suggested client sample rate (0.0–1.0). Clients may adopt gradually.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sample_rate: Option<f64>,
 }
 
 #[cfg(test)]

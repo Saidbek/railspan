@@ -24,5 +24,8 @@ fmt:
 clippy:
     cargo clippy --workspace --all-targets -- -D warnings
 
+bench:
+    ruby scripts/bench_overhead.rb 20000
+
 dummy:
     cd examples/dummy_rails && RAILSPAN_EXPORTER=http RAILSPAN_ENDPOINT=http://127.0.0.1:7421 bundle exec rails server -p 3000

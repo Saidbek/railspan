@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use railspan_server::ServeConfig;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -7,8 +7,18 @@ use tracing::info;
 #[derive(Parser, Debug)]
 #[command(name = "railspan", version, about = "Lightweight Rails-first APM")]
 struct Cli {
+    /// Log format: text (default) or json for production aggregators
+    #[arg(long, env = "RAILSPAN_LOG_FORMAT", global = true, default_value = "text")]
+    log_format: LogFormat,
+
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+enum LogFormat {
+    Text,
+    Json,
 }
 
 #[derive(Subcommand, Debug)]
@@ -19,8 +29,12 @@ enum Commands {
         addr: SocketAddr,
         #[arg(long, env = "RAILSPAN_DATA_DIR", default_value = "./data")]
         data_dir: PathBuf,
+        /// Bearer token for POST /v1/* ingest
         #[arg(long, env = "RAILSPAN_API_KEY")]
         api_key: Option<String>,
+        /// Bearer token for GET /api/* UI queries (defaults to --api-key)
+        #[arg(long, env = "RAILSPAN_UI_TOKEN")]
+        ui_token: Option<String>,
         /// Keep probability for non-error/non-slow traces (0.0–1.0)
         #[arg(long, env = "RAILSPAN_SAMPLE_RATE", default_value = "1.0")]
         sample_rate: f64,
@@ -36,21 +50,35 @@ enum Commands {
     },
 }
 
+fn init_tracing(format: LogFormat) {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| "info,tower_http=info".into());
+    match format {
+        LogFormat::Json => {
+            tracing_subscriber::fmt()
+                .json()
+                .with_env_filter(filter)
+                .with_current_span(false)
+                .with_span_list(false)
+                .init();
+        }
+        LogFormat::Text => {
+            tracing_subscriber::fmt().with_env_filter(filter).init();
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info,tower_http=info".into()),
-        )
-        .init();
-
     let cli = Cli::parse();
+    init_tracing(cli.log_format);
+
     match cli.command {
         Commands::Serve {
             addr,
             data_dir,
             api_key,
+            ui_token,
             sample_rate,
             slow_ms,
             retention_days,
@@ -61,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
                 addr,
                 data_dir,
                 api_key,
+                ui_token,
                 sample_rate,
                 slow_ms,
                 retention_days,

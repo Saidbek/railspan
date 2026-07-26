@@ -2,7 +2,7 @@
 
 **Working title:** Railspan  
 **One-liner:** Lightweight, self-hosted, Rails-first APM (traces, RED metrics, N+1, jobs).  
-**Status:** Planning complete — ready for epics/stories and implementation.  
+**Status:** Phases 0–5 implemented (MVP + hardening). Phase 6 packaging next.  
 **Root:** `/Users/said.kaldybaev/projects/railspan`
 
 ---

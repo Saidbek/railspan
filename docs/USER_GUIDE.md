@@ -65,12 +65,33 @@ Railspan.record_deploy!(git_sha: ENV["GIT_SHA"], version: ENV["APP_VERSION"])
 | `--addr` | `RAILSPAN_INGEST_ADDR` | `127.0.0.1:7421` |
 | `--data-dir` | `RAILSPAN_DATA_DIR` | `./data` |
 | `--api-key` | `RAILSPAN_API_KEY` | none |
+| `--ui-token` | `RAILSPAN_UI_TOKEN` | same as API key |
 | `--sample-rate` | `RAILSPAN_SAMPLE_RATE` | `1.0` |
 | `--slow-ms` | `RAILSPAN_SLOW_MS` | `500` |
 | `--retention-days` | `RAILSPAN_RETENTION_DAYS` | `7` |
 | `--n1-threshold` | `RAILSPAN_N1_THRESHOLD` | `5` |
+| `--log-format` | `RAILSPAN_LOG_FORMAT` | `text` (`json` supported) |
 
-Sampling always keeps error and slow roots; other traces kept with probability `sample_rate`.
+### Auth
+
+- **Ingest** `POST /v1/*`: Bearer `RAILSPAN_API_KEY` when set.
+- **Query API** `GET /api/*`: Bearer `RAILSPAN_UI_TOKEN`, or the API key if UI token is unset.
+- **UI**: open HTML; click **Auth** to store a token in `sessionStorage` (sent on API calls).
+- **Health** `/healthz`: always open.
+
+### Sampling
+
+- **Server:** always keeps error and slow roots; other traces kept with probability `sample_rate`.
+- **Adaptive advice:** ingest responses include `advice.sample_rate` under load; the gem may lower client head-sampling.
+- **Gem head sampling:** `sample_rate` can skip instrumenting some requests/jobs entirely.
+
+### Hardening
+
+- Retention worker deletes traces older than `--retention-days` (hourly).
+- Batch limits: max 5000 spans, body ≤ 16 MiB → HTTP 413.
+- Attribute/event cardinality caps on ingest.
+- Overhead microbench: `./scripts/bench_overhead.sh` (see [OVERHEAD.md](./OVERHEAD.md)).
+- Soak + security: [runbooks/SOAK.md](./runbooks/SOAK.md), [SECURITY_CHECKLIST.md](./SECURITY_CHECKLIST.md).
 
 ## API
 

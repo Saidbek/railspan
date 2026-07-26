@@ -6,6 +6,7 @@ module Railspan
       class ServerMiddleware
         def call(worker, job, queue)
           return yield unless Railspan.config.enabled?
+          return yield unless Railspan::Tracer.sample_root?
 
           class_name = job["class"] || worker.class.name
           Railspan::Tracer.in_span(

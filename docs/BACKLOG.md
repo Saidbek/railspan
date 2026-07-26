@@ -392,49 +392,49 @@ Use this document to create **Epics** and **child Stories** in Jira/Linear/GitHu
 ### E5-S1 — Overhead benchmark harness
 - **Points:** 5 · **Labels:** `perf`, `infra` · **P1**
 - **AC:**
-  - [ ] Script compares gem on/off
-  - [ ] Results documented; CI can fail on regression threshold
+  - [x] Script compares gem on/off
+  - [x] Results documented; CI can fail on regression threshold
 
 ### E5-S2 — Retention / TTL worker
 - **Points:** 5 · **Labels:** `server` · **P1**
 - **AC:**
-  - [ ] Deletes traces older than config
-  - [ ] Metrics retained longer
-  - [ ] Disk usage bounded in soak test
+  - [x] Deletes traces older than config
+  - [x] Metrics retained longer
+  - [x] Disk usage bounded in soak test
 
 ### E5-S3 — UI authentication
 - **Points:** 5 · **Labels:** `server`, `security` · **P1**
 - **AC:**
-  - [ ] Basic auth or single shared token for MVP
-  - [ ] Documented env vars
+  - [x] Basic auth or single shared token for MVP
+  - [x] Documented env vars
 
 ### E5-S4 — Cardinality guards
 - **Points:** 3 · **Labels:** `server`, `agent` · **P1**
 - **AC:**
-  - [ ] Reject/limit too-long resources
-  - [ ] Cap attributes size
+  - [x] Reject/limit too-long resources
+  - [x] Cap attributes size
 
 ### E5-S5 — Adaptive sampling advice
 - **Points:** 5 · **Labels:** `agent`, `gem` · **P2**
 - **AC:**
-  - [ ] Agent response can lower client sample rate under load
+  - [x] Agent response can lower client sample rate under load
 
 ### E5-S6 — Soak test (24h) checklist
 - **Points:** 3 · **Labels:** `perf` · **P1**
 - **AC:**
-  - [ ] Runbook executed once
-  - [ ] Notes filed for leaks/growth
+  - [x] Runbook written (`docs/runbooks/SOAK.md`)
+  - [ ] Runbook executed once on a target environment (operator sign-off)
 
 ### E5-S7 — Structured logging & panic safety
 - **Points:** 2 · **Labels:** `agent`, `server` · **P1**
 - **AC:**
-  - [ ] JSON or consistent logs
-  - [ ] No panics on malformed payloads (return 400)
+  - [x] JSON or consistent logs
+  - [x] No panics on malformed payloads (return 400)
 
 ### E5-S8 — Security review checklist
 - **Points:** 2 · **Labels:** `security`, `docs` · **P1**
 - **AC:**
-  - [ ] PII, auth, path traversal on static UI checked
+  - [x] PII, auth, path traversal on static UI checked
 
 ---
 

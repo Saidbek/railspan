@@ -5,7 +5,7 @@ Self-hosted. Open source. Rust agent/server + Ruby gem.
 
 > Not a Datadog clone. Skylight-depth for teams who want to own their data.
 
-**Status:** MVP complete (instrumentation → serve → SQLite → UI). Production hardening ongoing.
+**Status:** MVP + Phase 5 hardening complete. Packaging (Phase 6) next.
 
 ## Quick start
 
@@ -38,6 +38,8 @@ curl localhost:3000/users/with_posts   # triggers N+1
 | Jobs dashboard | ✅ |
 | Deploy markers | ✅ |
 | Sampling + retention | ✅ |
+| UI/API auth + adaptive sampling | ✅ |
+| Overhead bench + soak/security docs | ✅ |
 | OTLP / ClickHouse | ⏳ future |
 
 ## Docs

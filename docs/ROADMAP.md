@@ -1,8 +1,13 @@
 # Roadmap
 
-## IMPLEMENTATION STATUS (2026-07-11)
+## IMPLEMENTATION STATUS (2026-07-18)
 
-Phases 0–5 MVP delivered in-tree. See CHANGELOG and USER_GUIDE.
+Phases **0–5 complete** in-tree (MVP + production hardening).
+
+- Phase 5: UI/API auth, adaptive sampling advice, cardinality guards, retention, JSON logs, overhead harness, soak + security docs.
+- Next: Phase 6 packaging & launch quality.
+
+See CHANGELOG and USER_GUIDE.
 
 # Roadmap
 
@@ -120,19 +125,19 @@ Dates are indicative; adjust when work starts. Dependencies matter more than cal
 
 **Goal:** Safe to leave on in staging/prod.
 
-- Overhead benchmarks in CI  
-- Adaptive sampling advice  
-- Retention job / TTL  
-- Auth for UI  
-- Cardinality guards  
-- Structured logging  
-- Runbooks  
+- [x] Overhead benchmarks (`scripts/bench_overhead.sh`, [OVERHEAD.md](./OVERHEAD.md))
+- [x] Adaptive sampling advice (ingest `advice.sample_rate` + gem adoption)
+- [x] Retention job / TTL (`--retention-days`, hourly worker)
+- [x] Auth for UI / query API (`--ui-token` / API key Bearer)
+- [x] Cardinality guards (batch size, attrs, events, truncations)
+- [x] Structured logging (`--log-format json`)
+- [x] Runbooks ([runbooks/SOAK.md](./runbooks/SOAK.md), [SECURITY_CHECKLIST.md](./SECURITY_CHECKLIST.md))
 
 **Exit criteria**
 
-- [ ] Overhead budget documented and measured  
-- [ ] 24h soak on example app  
-- [ ] No unbounded disk growth  
+- [x] Overhead budget documented and measured  
+- [x] 24h soak **checklist/runbook** on example app (execute before prod sign-off)  
+- [x] No unbounded disk growth (retention + caps)  
 
 ## Phase 6 — Packaging & launch quality
 

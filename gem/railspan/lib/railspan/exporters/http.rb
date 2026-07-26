@@ -95,9 +95,39 @@ module Railspan
         req["Content-Type"] = "application/json"
         req["Authorization"] = "Bearer #{@config.api_key}" if @config.api_key && !@config.api_key.empty?
         req.body = JSON.generate(payload)
-        http.request(req)
+        res = http.request(req)
+        apply_advice!(res)
       rescue StandardError => e
         warn "[railspan] http export failed: #{e.class}: #{e.message}" if ENV["RAILSPAN_DEBUG"]
+      end
+
+      # Adopt adaptive sampling advice from the server when under load.
+      def apply_advice!(res)
+        return unless res.is_a?(Net::HTTPSuccess)
+        return if res.body.nil? || res.body.empty?
+
+        data = JSON.parse(res.body)
+        advice = data["advice"]
+        return unless advice.is_a?(Hash)
+
+        rate = advice["sample_rate"]
+        return unless rate.is_a?(Numeric)
+
+        new_rate = rate.to_f.clamp(0.0, 1.0)
+        old = @config.sample_rate.to_f
+        # Only lower (or gently raise toward advice) — never jump up aggressively.
+        adopted = if new_rate < old
+                    new_rate
+                  else
+                    # Slow recovery: move halfway toward advised rate
+                    old + ((new_rate - old) * 0.25)
+                  end
+        @config.sample_rate = adopted.clamp(0.0, 1.0)
+        return unless ENV["RAILSPAN_DEBUG"] && (adopted - old).abs > 0.001
+
+        warn "[railspan] adapted sample_rate #{old} -> #{@config.sample_rate}"
+      rescue StandardError
+        # fail-open: ignore bad advice payloads
       end
     end
   end

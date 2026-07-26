@@ -142,7 +142,7 @@ Agent may respond:
 }
 ```
 
-Gem may adapt client sample rate (Phase 2). MVP can ignore `advice`.
+Gem adapts client sample rate when advice is present (Phase 5).
 
 ## Query API (server → UI)
 

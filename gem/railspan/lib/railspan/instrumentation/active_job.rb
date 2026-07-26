@@ -14,6 +14,7 @@ module Railspan
         ::ActiveSupport::Notifications.subscribe("perform_start.active_job") do |*args|
           event = as_event(args)
           next unless Railspan.config.enabled?
+          next unless Tracer.sample_root?
 
           job = event.payload[:job]
           next unless job

@@ -110,6 +110,7 @@ async fn ingest_traces(
         ok: true,
         accepted_spans: count,
         dropped_spans: 0,
+        advice: None,
     }))
 }
 
