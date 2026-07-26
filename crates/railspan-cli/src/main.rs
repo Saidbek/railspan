@@ -55,6 +55,10 @@ enum Commands {
         /// Local app source root for UI code highlight (`GET /api/v1/source`)
         #[arg(long, env = "RAILSPAN_SOURCE_ROOT")]
         source_root: Option<PathBuf>,
+        /// Dev-only: do not serve embedded Vue assets; redirect UI routes here
+        /// (e.g. http://127.0.0.1:5173 for Vite). API routes stay on this process.
+        #[arg(long, env = "RAILSPAN_DEV_UI_URL")]
+        dev_ui_url: Option<String>,
     },
 }
 
@@ -92,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
             retention_days,
             n1_threshold,
             source_root,
+            dev_ui_url,
         } => {
             info!(%addr, data_dir = %data_dir.display(), "starting railspan serve");
             railspan_server::serve(ServeConfig {
@@ -104,6 +109,7 @@ async fn main() -> anyhow::Result<()> {
                 retention_days,
                 n1_threshold,
                 source_root,
+                dev_ui_url,
             })
             .await?;
         }

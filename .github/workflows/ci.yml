@@ -6,6 +6,27 @@ on:
   pull_request:
 
 jobs:
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: install
+        working-directory: ui
+        run: npm ci
+      - name: build
+        working-directory: ui
+        run: npm run build
+      - name: ensure static assets committed
+        run: |
+          git add -A crates/railspan-server/static
+          git diff --cached --exit-code -- crates/railspan-server/static \
+            || (echo "UI source changed but crates/railspan-server/static is stale. Run: cd ui && npm run build" && exit 1)
+
   rust:
     runs-on: ubuntu-latest
     steps:

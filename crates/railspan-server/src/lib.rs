@@ -7,13 +7,15 @@ pub use store::{
     TraceSummary,
 };
 
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, HeaderMap, Request, StatusCode};
+use axum::http::{header, HeaderMap, Request, StatusCode, Uri};
 use axum::middleware::{from_fn_with_state, Next};
-use axum::response::{Html, IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use railspan_protocol::{IngestAdvice, IngestResponse, Span, TraceBatch, PROTOCOL_VERSION};
+use rust_embed::Embed;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -24,6 +26,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
+
+/// Built Vue SPA assets (`cd ui && npm run build` → `static/`).
+#[derive(Embed)]
+#[folder = "static/"]
+struct UiAssets;
 
 /// Reject batches larger than this (cardinality / DoS guard).
 pub const MAX_SPANS_PER_BATCH: usize = 5_000;
@@ -62,6 +69,9 @@ pub struct AppState {
     pub slow_ms: u64,
     /// Optional app checkout root for `GET /api/v1/source` code highlight.
     pub source_root: Option<PathBuf>,
+    /// When set (local `just dev`), do not serve the embedded production SPA;
+    /// redirect browser UI routes to this Vite URL instead.
+    pub dev_ui_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +86,8 @@ pub struct ServeConfig {
     pub n1_threshold: u32,
     /// Local path to application source for UI code snippets.
     pub source_root: Option<PathBuf>,
+    /// Vite dev origin, e.g. `http://127.0.0.1:5173`. API-only mode for local UI work.
+    pub dev_ui_url: Option<String>,
 }
 
 impl Default for ServeConfig {
@@ -90,13 +102,13 @@ impl Default for ServeConfig {
             retention_days: 7,
             n1_threshold: 5,
             source_root: None,
+            dev_ui_url: None,
         }
     }
 }
 
 pub fn app(state: AppState) -> Router {
     Router::new()
-        .route("/", get(ui_index))
         .route("/healthz", get(healthz))
         .route("/v1/traces", post(ingest_traces))
         .route("/v1/deploys", post(create_deploy))
@@ -107,6 +119,8 @@ pub fn app(state: AppState) -> Router {
         .route("/api/v1/deploys", get(list_deploys))
         .route("/api/v1/stats", get(stats))
         .route("/api/v1/source", get(get_source))
+        // Vue SPA: hashed assets + history-mode fallback to index.html
+        .fallback(ui_spa_fallback)
         .layer(from_fn_with_state(state.clone(), ui_auth_middleware))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
@@ -144,6 +158,10 @@ pub async fn serve(config: ServeConfig) -> anyhow::Result<()> {
         sample_rate: config.sample_rate.clamp(0.0, 1.0),
         slow_ms: config.slow_ms,
         source_root,
+        dev_ui_url: config
+            .dev_ui_url
+            .map(|s| s.trim().trim_end_matches('/').to_string())
+            .filter(|s| !s.is_empty()),
     };
 
     // Retention worker — hourly TTL so disk stays bounded.
@@ -176,14 +194,76 @@ pub async fn serve(config: ServeConfig) -> anyhow::Result<()> {
             .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "(none)".into()),
+        ui = if state.dev_ui_url.is_some() {
+            "dev-redirect"
+        } else {
+            "vue-spa-embedded"
+        },
+        dev_ui_url = state.dev_ui_url.as_deref().unwrap_or("-"),
         "railspan serve listening"
     );
     axum::serve(listener, app(state)).await?;
     Ok(())
 }
 
-async fn ui_index() -> Html<&'static str> {
-    Html(include_str!("../static/index.html"))
+/// Serve embedded SPA files; unknown non-API paths fall back to `index.html` for Vue Router.
+/// In dev (`dev_ui_url` set), never serve production `static/` assets — redirect to Vite.
+async fn ui_spa_fallback(State(state): State<AppState>, uri: Uri) -> Response {
+    let path = uri.path();
+    if path.starts_with("/api/") || path.starts_with("/v1/") || path == "/healthz" {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    // Local `just dev`: API only on this port; UI lives on Vite.
+    if let Some(dev_ui) = state.dev_ui_url.as_ref() {
+        let dest = if path.is_empty() || path == "/" {
+            dev_ui.clone()
+        } else {
+            format!(
+                "{dev_ui}{path}{}",
+                uri.query().map(|q| format!("?{q}")).unwrap_or_default()
+            )
+        };
+        return Redirect::temporary(&dest).into_response();
+    }
+
+    let mut key = path.trim_start_matches('/');
+    if key.is_empty() {
+        key = "index.html";
+    }
+
+    if let Some(file) = UiAssets::get(key) {
+        return embedded_file_response(key, file.data.as_ref());
+    }
+
+    // Client-side routes: /jobs, /traces/:id, /resources/:name, …
+    if let Some(file) = UiAssets::get("index.html") {
+        return embedded_file_response("index.html", file.data.as_ref());
+    }
+
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        "UI assets missing — run: just ui-build  (or use `just dev` and open :5173)",
+    )
+        .into_response()
+}
+
+fn embedded_file_response(path: &str, bytes: &[u8]) -> Response {
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, mime.as_ref())
+        // Hashed Vite assets are immutable; HTML should revalidate.
+        .header(
+            header::CACHE_CONTROL,
+            if path.starts_with("assets/") {
+                "public, max-age=31536000, immutable"
+            } else {
+                "no-cache"
+            },
+        )
+        .body(Body::from(bytes.to_vec()))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 async fn healthz(State(state): State<AppState>) -> Json<serde_json::Value> {
@@ -803,6 +883,7 @@ mod tests {
             sample_rate: 1.0,
             slow_ms: 500,
             source_root: None,
+            dev_ui_url: None,
         }
     }
 
@@ -810,6 +891,56 @@ mod tests {
     async fn healthz_ok() {
         let app = app(test_state().await);
         let res = app
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn spa_serves_index_and_client_routes() {
+        let state = test_state().await;
+        for path in ["/", "/jobs", "/n-plus-one", "/traces/abc123"] {
+            let res = app(state.clone())
+                .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(res.status(), StatusCode::OK, "path {path}");
+            let ct = res
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            assert!(
+                ct.contains("text/html"),
+                "expected html for {path}, got {ct}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn dev_ui_url_redirects_spa_not_api() {
+        let mut state = test_state().await;
+        state.dev_ui_url = Some("http://127.0.0.1:5173".into());
+
+        let res = app(state.clone())
+            .oneshot(Request::builder().uri("/jobs").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::TEMPORARY_REDIRECT);
+        let loc = res
+            .headers()
+            .get(header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        assert_eq!(loc, "http://127.0.0.1:5173/jobs");
+
+        let res = app(state)
             .oneshot(
                 Request::builder()
                     .uri("/healthz")

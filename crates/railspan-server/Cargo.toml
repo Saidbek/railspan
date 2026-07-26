@@ -17,6 +17,8 @@ anyhow = { workspace = true }
 bytes = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"
 
 [dev-dependencies]
 tower = { workspace = true }

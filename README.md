@@ -57,9 +57,18 @@ curl localhost:3000/users/with_posts   # triggers N+1
 
 ```text
 crates/   railspan-cli, server, agent, protocol
+ui/       Vue 3 + TypeScript SPA (build → crates/railspan-server/static)
 gem/      Ruby SDK
 examples/ dummy_rails
 docs/     design + guides
+```
+
+### UI development
+
+```bash
+just dev          # API-only :7421 + Vite HMR :5173 — open http://127.0.0.1:5173
+                  # (does not run npm build / does not serve static/assets on :7421)
+just serve        # production: npm build → embed Vue on :7421 only
 ```
 
 ## License

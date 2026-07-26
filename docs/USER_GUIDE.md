@@ -129,7 +129,19 @@ Design notes: [SOURCE_LOCATIONS.md](./SOURCE_LOCATIONS.md).
 | GET | `/api/v1/source?path=&line=&context=` |
 | GET | `/api/v1/deploys` |
 | GET | `/api/v1/stats` |
-| GET | `/` UI |
+| GET | `/` UI (Vue SPA; also `/jobs`, `/n-plus-one`, `/deploys`, `/resources/…`, `/traces/…`) |
+
+### UI (Vue)
+
+Source lives in `ui/` (Vue 3 + TypeScript + Vue Router).
+
+```bash
+just dev      # local: API-only :7421 + Vite :5173 (no npm build / no embedded SPA)
+just serve    # production: npm build → embed UI on :7421 only
+just ui-build # only rebuild crates/railspan-server/static
+```
+
+With `just dev`, `:7421` redirects browser UI paths to Vite (`--dev-ui-url`); open **http://127.0.0.1:5173**.
 
 ## Docker
 

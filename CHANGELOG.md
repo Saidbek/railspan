@@ -8,6 +8,7 @@
 - `GET /api/v1/source` + `--source-root` for UI code highlight
 - Waterfall span detail panel with highlighted source snippet
 - Design doc: [docs/SOURCE_LOCATIONS.md](docs/SOURCE_LOCATIONS.md)
+- Vue 3 + TypeScript UI (`ui/`) with Vue Router (`/`, `/jobs`, `/n-plus-one`, `/deploys`, `/resources/:resource`, `/traces/:id`)
 
 ## 0.1.1 — 2026-07-18
 

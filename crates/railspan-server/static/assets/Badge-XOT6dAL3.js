@@ -1,0 +1,1 @@
+import{_ as e,f as t,h as n,w as r,y as i}from"./index-BsWEYXne.js";var a=n({__name:`Badge`,props:{variant:{}},setup(n){return(a,o)=>(e(),t(`span`,{class:r([`badge`,n.variant||void 0])},[i(a.$slots,`default`)],2))}});export{a as t};
