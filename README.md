@@ -3,8 +3,6 @@
 **Lightweight, Rails-first APM** — traces, SQL, N+1 detection, jobs, and a built-in UI.  
 Self-hosted. Open source. Rust agent/server + Ruby gem.
 
-> Not a Datadog clone. Skylight-depth for teams who want to own their data.
-
 **Status:** MVP + Phase 5 hardening complete. Packaging (Phase 6) next.
 
 ## Quick start
@@ -21,6 +19,11 @@ RAILSPAN_EXPORTER=http RAILSPAN_ENDPOINT=http://127.0.0.1:7421 bin/rails s -p 30
 curl localhost:3000/users
 curl localhost:3000/users/with_posts   # triggers N+1
 ```
+
+## Demo
+
+<img width="1512" height="340" alt="Screenshot 2026-07-25 at 9 21 47 PM" src="https://github.com/user-attachments/assets/7c97e7fd-fe8e-4c8a-9c48-5a756d2a55a2" />
+<img width="1512" height="864" alt="Screenshot 2026-07-25 at 9 22 05 PM" src="https://github.com/user-attachments/assets/5b30e3a1-dbd2-4e4b-9604-c317baa92fc0" />
 
 ## Features
 
